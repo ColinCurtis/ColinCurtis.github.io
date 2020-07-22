@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+        <title>Babylon.js sample code</title>
+
+        <!-- Babylon.js -->
+        <script src="https://code.jquery.com/pep/0.4.2/pep.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.2/dat.gui.min.js"></script>
+        <script src="https://preview.babylonjs.com/ammo.js"></script>
+        <script src="https://preview.babylonjs.com/cannon.js"></script>
+        <script src="https://preview.babylonjs.com/Oimo.js"></script>
+        <script src="https://preview.babylonjs.com/libktx.js"></script>
+        <script src="https://preview.babylonjs.com/earcut.min.js"></script>
+        <script src="https://preview.babylonjs.com/babylon.js"></script>
+        <script src="https://preview.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
+        <script src="https://preview.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+        <script src="https://preview.babylonjs.com/proceduralTexturesLibrary/babylonjs.proceduralTextures.min.js"></script>
+        <script src="https://preview.babylonjs.com/postProcessesLibrary/babylonjs.postProcess.min.js"></script>
+        <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.js"></script>
+        <script src="https://preview.babylonjs.com/serializers/babylonjs.serializers.min.js"></script>
+        <script src="https://preview.babylonjs.com/gui/babylon.gui.min.js"></script>
+
+        <style>
+            html, body {
+                overflow: hidden;
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+
+            #renderCanvas {
+                width: 100%;
+                height: 100%;
+                touch-action: none;
+            }
+        </style>
+    </head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <script>
+        var canvas = document.getElementById("renderCanvas");
+
+        var engine = null;
+        var scene = null;
+        var sceneToRender = null;
+        var createDefaultEngine = function() { return new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true }); };
+        //TODO: Make option for radio buttons or clicking on mesh to change color
+        //TODO: Make "Colors" button sit on top of screen but make GUI show up in middle left of screen
+        //TODO: Make "loading" screen
+        
+        // Add function getControlByName
+        BABYLON.GUI.AdvancedDynamicTexture.prototype.executeOnAllControls = function (func, container) {
+            // console.log('hijacked eoac run.  container: ', container);
+            if (!container) {
+                container = this._rootContainer;
+            }
+            for (var _i = 0, _a = container.children; _i < _a.length; _i++) {
+                var child = _a[_i];
+                if (child.children) {
+                    this.executeOnAllControls(func, child);
+                    continue;
+                }
+                func(child);
+            }
+        };
+        
+        BABYLON.GUI.AdvancedDynamicTexture.prototype.getControlByName = function (name) {
+            var foundControl = null;
+            if (name) {
+                this.executeOnAllControls(function(control) {
+                    if(control.name && control.name === name){
+                        foundControl = control;
+                    }
+                }, this._rootContainer);
+            }
+            return foundControl;
+        };
+        
+        // Create Scene
+        var createScene = function () {
+            var scene = new BABYLON.Scene(engine);
+        
+            var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, 1.0, 110, BABYLON.Vector3.Zero(), scene);
+            camera.attachControl(canvas, true);
+        
+            var hemi = new BABYLON.HemisphericLight("toto");
+        
+        var tempMaterial = new BABYLON.StandardMaterial("temp");
+        
+        //Import Mesh
+        
+            function namify(rawName) {
+                rawName = /_(.+)/.exec(rawName)[1]; // Remove numbers and _ in first part of filename
+                rawName = rawName.replace(/\.[^/.]+$/, ""); // Remove exgtension
+                return rawName;
+            };
+        
+            //***Insert array of filenames */
+            var meshList = ["236_Arteries.stl", "236_Implants.stl", "236_Skull bottom.stl", "236_Skull top.stl"];
+            var urlList = ["https://dl.dropbox.com/s/vsx2rjsohz0n0ne/236_Arteries.stl", "https://dl.dropbox.com/s/xrxvykrja3wr020/236_Implants.stl", "https://dl.dropbox.com/s/kc1rgabl5z35m57/236_Skull%20bottom.stl", "https://dl.dropbox.com/s/7pe0zbbrv4xtofj/236_Skull%20top.stl"];
+            var newMeshNames = [];
+            for (var i = 0, len = meshList.length; i < len; i++) {
+                newMeshNames.push(namify(meshList[i]));
+            };
+        
+            /**Insert file locations, on local drive or URL */
+            function getMeshFromArray(newMeshName, url) {
+                var importedMesh = BABYLON.SceneLoader.ImportMesh("", url, newMeshName, scene, function(newMeshes){
+                    var mesh = newMeshes[0];
+                    mesh.name = newMeshName;
+                    mesh.material = scene.getMaterialByName(newMeshName);
+                    mesh.material.backFaceCulling = false;
+                    mesh.material.needDepthPrePass = true;
+					//if (newMeshName === "236_Skull bottom.stl") {
+						mesh.forceSharedVertices();
+					//};
+                    scene.createDefaultCameraOrLight(true, true, true);
+                });
+            };
+        
+            
+            // GUI on the right
+            function makeGUI() {
+                
+                var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+                advancedTexture.layer.layerMask = 2; // ?
+        
+                var panel = new BABYLON.GUI.StackPanel("panel");
+                panel.width = "200px";
+                panel.fontSize = "14px";
+                //panel.paddingTop = "20px";
+                panel.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+                panel.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+                advancedTexture.addControl(panel);
+        
+                function removeSliderPicker() {
+                    if (advancedTexture.getControlByName("picker")) {
+                        panel.removeControl(advancedTexture.getControlByName("pickerHeader"));
+                        panel.removeControl(advancedTexture.getControlByName("picker"));
+                    }
+                    if (advancedTexture.getControlByName("slider")) {
+                        panel.removeControl(advancedTexture.getControlByName("sliderHeader"));
+                        panel.removeControl(advancedTexture.getControlByName("slider"));
+                    }
+                };
+        
+        // Checkboxes ////////////////////////////////////////////////////
+        
+            var checkboxes = [];
+            var headers = [];
+        
+            for (var i = 0, len = meshList.length; i < len; i++) {
+                checkboxes.push(new BABYLON.GUI.Checkbox(newMeshNames[i] + " Checkbox"));
+                checkboxes[i].width = "20px";
+                checkboxes[i].height = "20px";
+                checkboxes[i].isChecked = false;
+                checkboxes[i].color = "green";
+        
+                checkboxes[i].onIsCheckedChangedObservable.add(function(value) {
+                    var checked = [];
+                    var noneChecked = 1;
+                    removeSliderPicker();
+        
+                    for (var n = 0, len = checkboxes.length; n < len; n++) {
+                        if (checkboxes[n].isChecked) {
+                            checked.push(1);
+                        } else {
+                            checked.push(0);
+                        }
+                    }
+        
+                    alphaSlider(meshList, checked, panel);
+                    colorWheel(meshList, checked, panel);
+        
+                    for (var m = 0, len = checked.length; m < len; m++) {
+                        if (checked[m]) {
+                            noneChecked = 0;
+                        }
+                    }
+                    if (noneChecked) {
+                        //removeSliderPicker(); //Comment out to keep colorwheel and slider up when unchecked
+                    }
+        
+                });
+        
+                headers.push(BABYLON.GUI.Control.AddHeader(checkboxes[i], newMeshNames[i], "180px", { isHorizontal: true, controlFirst: true}));
+                headers[i].color = "white";
+                headers[i].height = "20px";
+                headers[i].horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+            };
+        
+        // Transparency and Color GUI
+        
+                var alphaSlider = function(meshList, checked, parent) {
+        
+                    var sliderText = new BABYLON.GUI.TextBlock("sliderHeader");
+                    sliderText.text = "Transparency:";
+                    sliderText.height = "40px";
+                    sliderText.color = "white";
+                    sliderText.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                    sliderText.paddingTop = "10px";
+        
+                    var slider = new BABYLON.GUI.Slider("slider");
+                    slider.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                    slider.minimum = 0;
+                    slider.maximum = 1;
+                    slider.color = "green";
+        
+                    slider.value = scene.getMaterialByName("temp").alpha;
+                    slider.height = "20px";
+                    slider.width = "200px";
+                    slider.onValueChangedObservable.add(function(value) {
+                        scene.getMaterialByName("temp").alpha = value;
+                        
+                        for (var u = 0, len = checked.length; u < len; u++) {
+                            if (checked[u]) {
+                                scene.getMaterialByName(meshList[u]).alpha = scene.getMaterialByName("temp").alpha;
+                            };
+                        };
+                    });
+        
+                    parent.addControl(sliderText);
+                    parent.addControl(slider);
+        
+                };
+        
+                var colorWheel = function(meshList, checked, parent) {
+        
+                    colorText = new BABYLON.GUI.TextBlock("pickerHeader");
+                    colorText.text = "Color:";
+                    colorText.height = "40px";
+                    colorText.color = "white";
+                    colorText.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                    colorText.paddingTop = "10px";
+        
+                    var picker = new BABYLON.GUI.ColorPicker("picker");
+                    picker.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                    picker.value = scene.getMaterialByName("temp").diffuseColor;
+                    picker.height = "150px";
+                    picker.width = "150px";
+                    picker.onValueChangedObservable.add(function(value) { // value is a color#
+                        scene.getMaterialByName("temp").diffuseColor = value;
+        
+                        for (var u = 0, len = checked.length; u < len; u++) {
+                            if (checked[u]) {
+                                scene.getMaterialByName(meshList[u]).diffuseColor = scene.getMaterialByName("temp").diffuseColor;
+                            };
+                        };
+                    });    
+        
+                    parent.addControl(colorText);
+                    parent.addControl(picker);
+        
+                };
+        
+                // Button to add and remove GUI elements
+        
+                var button1 = BABYLON.GUI.Button.CreateSimpleButton("button", "Change Colors");
+                button1.height = "40px";
+                button1.width = 0.3;
+                button1.background = "green";
+        
+                panel.addControl(button1);    
+                var test = 1;
+                button1.onPointerUpObservable.add(function() {
+        
+                    if (test === 1) { 
+                        
+                        for (var i = 0, len = headers.length; i < len; i++) {
+                            panel.addControl(headers[i]);
+                        };
+        
+                        test = 0;
+                        return;
+                    };
+        
+                    if (test === 0) {
+                        
+                        for (var i = 0, len = headers.length; i < len; i++) {
+                            panel.removeControl(headers[i]);
+                        };
+        
+                        removeSliderPicker();
+                        test=1;
+                    };
+                });
+            };
+            async function makeEverything(meshList, urlList) {
+                for (var i = 0, len = meshList.length; i < len; i++) {
+                    new BABYLON.StandardMaterial(meshList[i], scene);
+                    await getMeshFromArray(meshList[i], urlList[i]);
+                };
+        
+                //** Optional: Use the following lines to set the starting color */
+                scene.getMaterialByName(meshList[0]).diffuseColor = new BABYLON.Color3(0.89, 0.07, 0.14);
+                scene.getMaterialByName(meshList[0]).specularColor = new BABYLON.Color3(0.97, 0.67, 0.7);
+                scene.getMaterialByName(meshList[1]).diffuseColor = new BABYLON.Color3(0.77, 0.96, 1);
+                scene.getMaterialByName(meshList[2]).diffuseColor = new BABYLON.Color3(1, 1, 1);
+				scene.getMaterialByName(meshList[2]).alpha = 0.8;
+				scene.getMaterialByName(meshList[3]).diffuseColor = new BABYLON.Color3(1, 1, 1);
+				scene.getMaterialByName(meshList[3]).alpha = 0.2;
+                scene.getMaterialByName(meshList[1]).specularPower = 16.5;			
+                //
+        
+                makeGUI();
+            };
+        
+            makeEverything(meshList, urlList);
+        
+            return scene;
+        };
+        
+        
+        
+        
+var engine;
+try {
+    engine = createDefaultEngine();
+} catch(e) {
+    console.log("the available createEngine function failed. Creating the default engine instead");
+    engine = createDefaultEngine();
+}
+        if (!engine) throw 'engine should not be null.';
+        scene = createScene();;
+        sceneToRender = scene
+
+        engine.runRenderLoop(function () {
+            if (sceneToRender) {
+                sceneToRender.render();
+            }
+        });
+
+        // Resize
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+    </script>
+</body>
+</html>
