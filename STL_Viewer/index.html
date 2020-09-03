@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+        <title>Babylon.js sample code</title>
+
+        <!-- Babylon.js -->
+        <script src="https://code.jquery.com/pep/0.4.2/pep.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.2/dat.gui.min.js"></script>
+        <script src="https://preview.babylonjs.com/ammo.js"></script>
+        <script src="https://preview.babylonjs.com/cannon.js"></script>
+        <script src="https://preview.babylonjs.com/Oimo.js"></script>
+        <script src="https://preview.babylonjs.com/libktx.js"></script>
+        <script src="https://preview.babylonjs.com/earcut.min.js"></script>
+        <script src="https://preview.babylonjs.com/babylon.js"></script>
+        <script src="https://preview.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
+        <script src="https://preview.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+        <script src="https://preview.babylonjs.com/proceduralTexturesLibrary/babylonjs.proceduralTextures.min.js"></script>
+        <script src="https://preview.babylonjs.com/postProcessesLibrary/babylonjs.postProcess.min.js"></script>
+        <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.js"></script>
+        <script src="https://preview.babylonjs.com/serializers/babylonjs.serializers.min.js"></script>
+        <script src="https://preview.babylonjs.com/gui/babylon.gui.min.js"></script>
+		<script src="jquery.min.js"></script>
+		<!-- <script src="jquery.min.map"></script> -->
+        <style>
+            html, body {
+                overflow: hidden;
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+
+            #renderCanvas {
+                width: 100%;
+                height: 100%;
+                touch-action: none;
+            }
+        </style>
+    </head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <script>
+        var canvas = document.getElementById("renderCanvas");
+
+        var engine = null;
+        var scene = null;
+        var sceneToRender = null;
+        var createDefaultEngine = function() { return new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true }); };
+        var createScene = function () {
+        
+            // This creates a basic Babylon Scene object (non-mesh)
+            var scene = new BABYLON.Scene(engine);
+        
+            // This creates and positions a free camera (non-mesh)
+            var camera = new BABYLON.ArcRotateCamera("camera1", -Math.PI/2 , Math.PI/5 * 2, 5, new BABYLON.Vector3(0, 1, 0), scene);
+        
+            // This attaches the camera to the canvas
+            camera.attachControl(canvas, true);
+        
+            // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
+            var light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 1, 0), scene);
+        
+            // Default intensity is 1. Let's dim the light a small amount
+            light.intensity = 0.7;
+        
+            // Our built-in 'sphere' shape. Params: name, subdivs, size, scene
+            var sphere = BABYLON.Mesh.CreateSphere("sphere1", 16, 2, scene);
+        
+            // Move the sphere upward 1/2 its height
+            sphere.position.y = 1;
+        	var material = new BABYLON.StandardMaterial('newMaterial', scene);
+        	sphere.material = material;
+        	
+        	$('#upload').remove();
+        	$('body').append('<input id="upload" type="file" multiple style="position: absolute; top: 100px; right: 10px;"/>');
+        	$('#upload').on('change', handleFileSelect); // I added "<script src="jquery.min.js"> < /script>" to HTML file otherwise this doesn't work
+        	
+        	function handleFileSelect(evt) {
+        		var files = evt.target.files; // FileList object
+        		
+        		// Loop through the FileList and render image files as thumbnails.
+        		for (var i = 0, f; f = files[i]; i++) {
+        		
+        			// Only process image files.
+
+					if (f.type.match('image.*')) { // if f is not an image
+						
+						var reader = new FileReader();
+						
+						// Closure to capture the file information.
+						reader.onload = (function(theFile) {
+							return function (e) {
+								//console.log(e.target.result);
+								var image = e.target.result;
+								var texture = new BABYLON.Texture('data:my_image_name', scene, true,
+									true, BABYLON.Texture.BILINEAR_SAMPLINGMODE,
+									null, null, image, true);
+								sphere.material.diffuseTexture = texture;
+							};
+						})(f);
+				
+						// Read in the image file as a data URL.
+						reader.readAsDataURL(f);
+
+						
+					} else {
+						//console.log(f) // lists file details
+						//console.log(f.name)
+						
+						// Trying to load an stl
+						
+						var reader = new FileReader();
+						// Closure to capture the file information.
+						
+						reader.onload = (function(theFile) {
+							return function (e) {
+									
+									var base64_model_content = e.target.result;
+									
+									var raw_content = BABYLON.Tools.DecodeBase64(base64_model_content);
+									var blob = new Blob([raw_content]);
+									var url = URL.createObjectURL(blob);
+									BABYLON.SceneLoader.Append("", url, scene, function () { 
+										scene.createDefaultCamera(true, true, true);
+									}, undefined, undefined, ".stl");
+
+							};
+						})(f);
+						
+						reader.readAsDataURL(f);
+					}
+        		}
+				//$('#upload').remove();
+        	}
+			
+
+
+            return scene;
+        
+        };
+    var engine;
+    try {
+    engine = createDefaultEngine();
+    } catch(e) {
+    console.log("the available createEngine function failed. Creating the default engine instead");
+    engine = createDefaultEngine();
+    }
+        if (!engine) throw 'engine should not be null.';
+        scene = createScene();;
+        sceneToRender = scene
+
+        engine.runRenderLoop(function () {
+            if (sceneToRender) {
+                sceneToRender.render();
+            }
+        });
+
+        // Resize
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+    </script>
+</body>
+</html>
