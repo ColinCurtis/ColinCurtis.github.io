@@ -1,4 +1,3 @@
-<!-- HTML -->
 <!--#region fold -->
 <!DOCTYPE HTML>
 <html lang="en">
@@ -16,7 +15,6 @@
             overflow: auto;
         }
 
-
     </style>
 
 </head>
@@ -24,68 +22,12 @@
 <div class="container">
 
     <div>
-        <h1>DICOM Dump with Data Dictionary v<span id="version"></span></h1>
+        <h1>DICOM <a href="Single Artery Template.html">Dump</a> with Data Dictionary v<span id="version"></span></h1>
         <p class="lead">
             DICOM files dropped here are not uploaded anywhere, all processing
             is done inside your web browser in Javascript.
         </p>
-        <form class="form-inline">
-            <div class="form-group">
-                <label for="maxLength">Max Length</label>
-                <input type="text" class="form-control" id="maxLength" placeholder="(e.g. 128)" value="128">
-            </div>
-            <div class="form-group">
-                <label for="untilTag">Until Tag</label>
-                <input type="text" class="form-control" id="untilTag" placeholder="(e.g. x7fe00010)">
-            </div>
-            <br>
-            <div class="checkbox">
-                <label>
-                    <input id="privateElements" type="checkbox"> Private Elements
-                </label>
-            </div>
-            <div class="checkbox">
-                <label>
-                    <input id="p10Header" type="checkbox"> P10 Header
-                </label>
-            </div>
-            <div class="checkbox">
-                <label>
-                    <input id="emptyValues" type="checkbox"> Empty Values
-                </label>
-            </div>
-            <div class="checkbox">
-                <label>
-                    <input id="length" type="checkbox"> Length
-                </label>
-            </div>
-            <div class="checkbox">
-                <label>
-                    <input id="vr" type="checkbox"> VR
-                </label>
-            </div>
-            <div class="checkbox">
-                <label>
-                    <input id="groupElement" type="checkbox"> Group/Element
-                </label>
-            </div>
-            <div class="checkbox">
-                <label>
-                    <input id="fragments" type="checkbox"> Fragments
-                </label>
-            </div>
-            <div class="checkbox">
-                <label>
-                    <input id="frames" type="checkbox"> Frames
-                </label>
-            </div>
-            <div class="checkbox">
-                <label>
-                    <input id="sha1" type="checkbox"> SHA1
-                </label>
-            </div>
 
-        </form>
         <div id="status" class="alert alert-success">
             <div id="statusText">
                 Status: Ready (no file loaded)
@@ -95,10 +37,6 @@
             </ul>
         </div>
     </div>
-
-
-
-
 
     <div class="row">
         <div class="col-md-12">
@@ -134,7 +72,6 @@
 
 <!-- include Rusha for SHA1 hashing -->
 <script src="../rusha.min.js"></script>
-
 
 <script>
 
@@ -647,37 +584,6 @@ function dumpDataSet(dataSet, output)  ////(dicom data, empty array)
         throw ex;
     }
 }
-// filters
-<!--#region fold -->
-    function updateFilter() {
-        console.log('updateFilter');
-        maxLength = parseInt($("#maxLength").val());
-        untilTag = $('#untilTag').val();
-        showPrivateElements = $('#privateElements').prop('checked');
-        showP10Header = $('#p10Header').prop('checked');
-        showEmptyValues = $('#emptyValues').prop('checked');
-        showLength = $('#length').prop('checked');
-        showVR = $('#vr').prop('checked');
-        showGroupElement = $('#groupElement').prop('checked');
-        showFragments = $('#fragments').prop('checked');
-        showFrames = $('#frames').prop('checked');
-        showSHA1 = $('#sha1').prop('checked');
-
-        dumpFile();
-    }
-    //
-    $('#maxLength').change(updateFilter);
-    $('#untilTag').change(updateFilter);
-    $('#privateElements').change(updateFilter);
-    $('#p10Header').change(updateFilter);
-    $('#emptyValues').change(updateFilter);
-    $('#length').change(updateFilter);
-    $('#vr').change(updateFilter);
-    $('#groupElement').change(updateFilter);
-    $('#fragments').change(updateFilter);
-    $('#frames').change(updateFilter);
-    $('#sha1').change(updateFilter);
-<!-- #endregion -->
 
 // This function will read the file into memory and then start dumping it
 function dumpFile()
@@ -736,39 +642,6 @@ function dumpFile()
                     window.URL.revokeObjectURL(objectURL);
                     $(a).remove();
                 }
-
-                // Not useful
-                <!-- #regionfold -->
-                /*
-                function extractEncapsulatedImageFrame(frameIndex) {
-                    var element = dataSet.elements.x7fe00010;
-                    var isRLE = dataSet.string('x00020010') === '1.2.840.10008.1.2.5';
-                    var imageFrame;
-                    if(isRLE) {
-                        // RLE cannot be fragmented so frameIndex = fragmentIndex
-                        imageFrame = dicomParser.readEncapsulatedPixelDataFromFragments(dataSet, element, frameIndex);
-                    } else {
-                        var bot = element.basicOffsetTable;
-                        // if basic offset table is empty, calculate it
-                        if(bot.length === 0) {
-                            bot = dicomParser.createJPEGBasicOffsetTable(dataSet, element);
-                        }
-                        imageFrame = dicomParser.readEncapsulatedImageFrame(dataSet, element, frameIndex, bot);
-                    }
-                    return imageFrame;
-                }
-
-                $('.imageFrameDownload').click(function(ev) {   // ''$'' is commonly used as a shortcut to the function document.getElementById()
-                    var frameIndex = parseInt($(ev.currentTarget).attr('data-frameIndex'));
-                    var imageFrame = extractEncapsulatedImageFrame(frameIndex);
-                    var sopInstanceUid = dataSet.string('x00080018');
-                    var fileName = sopInstanceUid + "-imageFrame-" + frameIndex + ".dat";
-                    downloadData(imageFrame,fileName);
-                    ev.preventDefault();
-                    ev.stopPropagation();
-                });
-                */
-                <!-- #endregion -->
 
                 //When the link is clicked, you download the STL. Without this function, you go to top of the page and nothing else.
                 $('.dataDownload').click(function(ev) {
@@ -860,7 +733,7 @@ function handleFileSelect(evt) { // tgets called once the user drops the file on
     var files = evt.dataTransfer.files;
 
     // this UI is only built for a single file so just dump the first one
-    file = files[0]  ///////////////////////////////////////////// Assigns varaible file to the imported data for use in the dumpFile() function
+    file = files[0] // Assigns varaible file to the imported data for use in the dumpFile() function
     dumpFile();
 }
 
