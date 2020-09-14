@@ -1,0 +1,681 @@
+<!-- Working on listSTLURL and listNamesSTLs so they can import to CreateScene and add checkboxes -->
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+        <title>m3D 2D Viewer</title>
+
+        <!-- Babylon.js -->
+        <script src="https://code.jquery.com/pep/0.4.2/pep.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.6.2/dat.gui.min.js"></script>
+        <script src="https://preview.babylonjs.com/ammo.js"></script>
+        <script src="https://preview.babylonjs.com/cannon.js"></script>
+        <script src="https://preview.babylonjs.com/Oimo.js"></script>
+        <script src="https://preview.babylonjs.com/libktx.js"></script>
+        <script src="https://preview.babylonjs.com/earcut.min.js"></script>
+        <script src="https://preview.babylonjs.com/babylon.js"></script>
+        <script src="https://preview.babylonjs.com/inspector/babylon.inspector.bundle.js"></script>
+        <script src="https://preview.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+        <script src="https://preview.babylonjs.com/proceduralTexturesLibrary/babylonjs.proceduralTextures.min.js"></script>
+        <script src="https://preview.babylonjs.com/postProcessesLibrary/babylonjs.postProcess.min.js"></script>
+        <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.js"></script>
+        <script src="https://preview.babylonjs.com/serializers/babylonjs.serializers.min.js"></script>
+        <script src="https://preview.babylonjs.com/gui/babylon.gui.min.js"></script>
+		<script src="jquery.min.js"></script>
+
+        <!-- DICOM parsing -->
+        <script src="dicomParser.min.js"></script>
+        <!--<script>window.dicomParser || document.write('<script src="https://unpkg.com/dicom-parser">\x3C/script>')</script>-->
+        <!-- pako - needed to support deflated transfer syntax -->
+        <script src="pako.min.js"></script>
+        <!-- include the data dictionary -->
+        <script src="dataDictionary.js"></script>
+        <!-- include the uids -->
+        <script src="uids.js"></script>
+
+        <style>
+            html, body {
+                overflow: hidden;
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+
+            #renderCanvas {
+                width: 100%;
+                height: 100%;
+                touch-action: none;
+            }
+        </style>
+    </head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+
+    <script>
+        var canvas = document.getElementById("renderCanvas");
+        var engine = null;
+        var scene = null;
+        var sceneToRender = null;
+        var createDefaultEngine = function() { return new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true }); };
+
+        var dataSet; // the parsed DICOM dataSet as global so we can interact with it from console
+        var untilTag = "";
+        var file = undefined;
+
+        // Add BabylonJS function getControlByName
+        <!--#region fold -->
+        BABYLON.GUI.AdvancedDynamicTexture.prototype.executeOnAllControls = function (func, container) {
+            // console.log('hijacked eoac run.  container: ', container);
+            if (!container) {
+                container = this._rootContainer;
+            }
+            for (var _i = 0, _a = container.children; _i < _a.length; _i++) {
+                var child = _a[_i];
+                if (child.children) {
+                    this.executeOnAllControls(func, child);
+                    continue;
+                }
+                func(child);
+            }
+        };
+
+        BABYLON.GUI.AdvancedDynamicTexture.prototype.getControlByName = function (name) {
+            var foundControl = null;
+            if (name) {
+                this.executeOnAllControls(function(control) {
+                    if(control.name && control.name === name){
+                        foundControl = control;
+                    }
+                }, this._rootContainer);
+            }
+            return foundControl;
+        };
+        <!-- #endregion -->
+
+        // Create BabylonJS Scene
+        var createScene = function (url1, name1) {
+            var scene = new BABYLON.Scene(engine);
+
+            // Camera
+            var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, 1.0, 110, BABYLON.Vector3.Zero(), scene);
+            camera.attachControl(canvas, true);
+			camera.multiTouchPanAndZoom = true; // Pan on touch screen with two fingers
+			camera.speed = 1;
+
+            // Light
+            var hemi = new BABYLON.HemisphericLight("toto");
+
+            var tempMaterial = new BABYLON.StandardMaterial("temp"); // GUI changes the "temp" material, then objects' materials copy the "temp"
+
+            // Mesh importing
+            <!-- #region fold -->
+
+            // Namify cleans up names for labeling. Expects STL file name structure to be <number>_<name>.<extension (length agnostic I think)>
+            function namify(rawName) {
+                rawName = /_(.+)/.exec(rawName)[1]; // Remove numbers and _ in first part of filename
+                rawName = rawName.replace(/\.[^/.]+$/, ""); // Remove extension
+                return rawName;
+            };
+
+            //***Insert array of filenames ***
+            var meshList = [];
+            //var meshList = ["236_Arteries.stl", "236_Skull bottom.stl", "236_Skull top.stl"];
+            //if (name1) {
+            //    meshList.push(name1)
+            //}
+            //console.log(meshList)
+            var urlList = [];
+            //var urlList = ["https://dl.dropbox.com/s/vsx2rjsohz0n0ne/236_Arteries.stl", "https://dl.dropbox.com/s/k8c148mspznpaot/236_Skull%20bottom.stl", "https://dl.dropbox.com/s/watabn3g4kzqu3h/236_Skull%20top.stl"];
+            //if (url1) {
+            //    urlList.push(url1)
+            //    console.log("works")
+            //}
+            var newMeshNames = [];
+
+            // Rename the meshes for better labels
+            for (var i = 0, len = meshList.length; i < len; i++) {
+                newMeshNames.push(namify(meshList[i]));
+            };
+            console.log(newMeshNames)
+
+            function getMeshFromArray(newMeshName, url) {
+                var importedMesh = BABYLON.SceneLoader.ImportMesh("", url, newMeshName, scene, function(newMeshes){
+                    // Everything in this function executes after mesh is loaded, but everything outside must be told to wait to make changes to mesh
+                    var mesh = newMeshes[0];
+                    mesh.name = newMeshName;
+                    mesh.material = scene.getMaterialByName(newMeshName);
+                    mesh.material.backFaceCulling = false;
+                    mesh.material.needDepthPrePass = true;
+					mesh.forceSharedVertices(); // Shade smooth
+
+					// Create camera framed on loaded meshes
+                    scene.createDefaultCameraOrLight(true, true, true);
+					scene.activeCamera.speed = 1;
+                    scene.activeCamera.multiTouchPanAndZoom = true;
+					scene.activeCamera.inertia = 0.84;
+					scene.activeCamera.panningSensibility = 150;
+                });
+            };
+            <!-- #endregion -->
+
+            // GUI
+            <!-- #region fold -->
+
+            function makeGUI() {
+
+                var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+                //advancedTexture.layer.layerMask = 2; // ?
+
+                var panel = new BABYLON.GUI.StackPanel("panel");
+                panel.width = "200px";
+                //panel.height = "100px";
+                panel.fontSize = "14px";
+                //panel.paddingTop = "20px"; //Cuts bottom 20px off
+                panel.paddingLeft = "10px";
+                panel.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                panel.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+                advancedTexture.addControl(panel);
+
+                // Function to remove slider and color wheel
+                function removeSliderPicker() {
+                    if (advancedTexture.getControlByName("picker")) {
+                        panel.removeControl(advancedTexture.getControlByName("pickerHeader"));
+                        panel.removeControl(advancedTexture.getControlByName("picker"));
+                    }
+                    if (advancedTexture.getControlByName("slider")) {
+                        panel.removeControl(advancedTexture.getControlByName("sliderHeader"));
+                        panel.removeControl(advancedTexture.getControlByName("slider"));
+                    }
+                };
+
+                // Transparency and Color GUI
+                var alphaSlider = function(meshList, checked, parent) {
+
+                    // "Transparency"
+                    var sliderText = new BABYLON.GUI.TextBlock("sliderHeader");
+                    sliderText.text = "Transparency:";
+                    sliderText.height = "40px";
+                    sliderText.color = "white";
+                    sliderText.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                    sliderText.paddingTop = "10px";
+
+                    // "Alpha Slider"
+                    var slider = new BABYLON.GUI.Slider("slider");
+                    slider.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                    slider.minimum = 0;
+                    slider.maximum = 1;
+                    slider.color = "green";
+
+                    slider.value = scene.getMaterialByName("temp").alpha;
+                    slider.height = "20px";
+                    slider.width = "180px";
+                    slider.onValueChangedObservable.add(function(value) {
+                        scene.getMaterialByName("temp").alpha = value;
+
+                        // Go through checkboxes to see if they are checked. If they are, their alpha changes
+                        for (var u = 0, len = checked.length; u < len; u++) {
+                            if (checked[u]) {
+                                scene.getMaterialByName(meshList[u]).alpha = scene.getMaterialByName("temp").alpha;
+                            };
+                        };
+                    });
+
+                    parent.addControl(sliderText);
+                    parent.addControl(slider);
+
+                };
+
+                var colorWheel = function(meshList, checked, parent) {
+                    // "Color" header
+                    colorText = new BABYLON.GUI.TextBlock("pickerHeader");
+                    colorText.text = "Color:";
+                    colorText.height = "40px";
+                    colorText.color = "white";
+                    colorText.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                    colorText.paddingTop = "10px";
+
+                    // Color Wheel
+                    var picker = new BABYLON.GUI.ColorPicker("picker");
+                    picker.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                    picker.value = scene.getMaterialByName("temp").diffuseColor;
+                    picker.height = "150px";
+                    picker.width = "150px";
+                    picker.onValueChangedObservable.add(function(value) { // value is a color#
+                        scene.getMaterialByName("temp").diffuseColor = value;
+
+                        // Go through checkboxes to see if they are checked. If they are, their color changes
+                        for (var u = 0, len = checked.length; u < len; u++) {
+                            if (checked[u]) {
+                                scene.getMaterialByName(meshList[u]).diffuseColor = scene.getMaterialByName("temp").diffuseColor;
+                            };
+                        };
+                    });
+                    parent.addControl(colorText);
+                    parent.addControl(picker);
+                };
+
+                // Checkboxes
+                var checkboxes = [];
+                var headers = [];
+
+                for (var i = 0, len = meshList.length; i < len; i++) {
+                    checkboxes.push(new BABYLON.GUI.Checkbox(newMeshNames[i] + " Checkbox"));
+                    checkboxes[i].width = "20px";
+                    checkboxes[i].height = "20px";
+                    checkboxes[i].isChecked = false;
+                    checkboxes[i].color = "green";
+
+                    // When a checkbox is clicked, see if
+                    checkboxes[i].onIsCheckedChangedObservable.add(function(value) {
+                        var checked = [];
+                        var noneChecked = 1;
+                        removeSliderPicker();
+
+                        for (var n = 0, len = checkboxes.length; n < len; n++) {
+                            if (checkboxes[n].isChecked) {
+                                checked.push(1);
+                            } else {
+                                checked.push(0);
+                            }
+                        }
+
+                        alphaSlider(meshList, checked, panel);
+                        colorWheel(meshList, checked, panel);
+
+                        // If all checkboxes are unchecked, remove slider and color wheel
+                        for (var m = 0, len = checked.length; m < len; m++) {
+                            if (checked[m]) {
+                                noneChecked = 0;
+                            }
+                        }
+                        if (noneChecked) {
+                            removeSliderPicker(); //Comment out to keep colorwheel and slider visible when everything is unchecked
+                        }
+
+                    });
+
+                    headers.push(BABYLON.GUI.Control.AddHeader(checkboxes[i], newMeshNames[i], "180px", { isHorizontal: true, controlFirst: true}));
+                    headers[i].color = "white";
+                    headers[i].height = "20px";
+                    headers[i].horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                };
+
+                // "Change Colors" button that adds and removes GUI elements
+
+                var button1 = BABYLON.GUI.Button.CreateSimpleButton("button1", "Change Colors");
+                button1.height = "40px";
+                button1.width = 0.3;
+                button1.background = "green";
+
+                panel.addControl(button1);
+                var buttonOn = 1;
+                button1.onPointerUpObservable.add(function() {
+
+                    if (buttonOn) {
+
+                        // "Upload Files" button
+                        $('#upload').remove(); // Not sure if this line is needed
+                        $('body').append('<input id="upload" type="file" multiple style="position: absolute; top: 10px; left: 150px;"/>');
+                        $('#upload').on('change', handleFileSelect); // I added "<script src="jquery.min.js"> < /script>" to HTML file otherwise this doesn't work
+
+                        // Checkboxes
+                        for (var i = 0, len = headers.length; i < len; i++) {
+                            panel.addControl(headers[i]);
+                        };
+
+                        buttonOn = 0;
+                        return;
+
+                    } else {
+
+                        $('#upload').remove();
+
+                        for (var i = 0, len = headers.length; i < len; i++) {
+                            panel.removeControl(headers[i]);
+                        };
+
+                        removeSliderPicker();
+                        buttonOn=1;
+                    };
+                });
+            }; // End of makeGUI
+            <!-- #endregion -->
+
+            // With async, this function waits for any line prefixed "await" to be done before moving on.
+            // Without "await," any changes to the mesh while it is still loading will not take effect
+            async function makeEverything(meshList, urlList) {
+                for (var i = 0, len = meshList.length; i < len; i++) {
+                    new BABYLON.StandardMaterial(meshList[i], scene);
+                    await getMeshFromArray(meshList[i], urlList[i]);
+                };
+
+                //** Optional: Use the following lines to set the starting color
+
+				//scene.getMaterialByName(meshList[0]).diffuseColor = new BABYLON.Color3(0.89, 0.13, 0.13); // Mesh color
+                //scene.getMaterialByName(meshList[0]).specularColor = new BABYLON.Color3(0.97, 0.67, 0.7); //Reflected color
+				//scene.getMaterialByName(meshList[0]).alpha = 0.8; // Transparency
+
+                makeGUI();
+            };
+
+            makeEverything(meshList, urlList);
+
+            function loadFiles(files, callback) {
+                var listNamesSTLs = [];
+                var listSTLURL = [];
+                // Loop through the FileList and render image files as thumbnails.
+                for (var i = 0, f; f = files[i]; i++) {
+
+                    if (f === undefined) {
+                        return;
+
+                        // Image
+                        <!-- #region fold -->
+                    } else if (f.type.match('image.*')) {
+                        var reader = new FileReader();
+
+                        // Closure to capture the file information.
+                        reader.onload = (function(theFile) {
+                            return function (e) {
+                                //console.log(e.target.result);
+                                var image = e.target.result;
+                                var texture = new BABYLON.Texture('data:my_image_name', scene, true,
+                                    true, BABYLON.Texture.BILINEAR_SAMPLINGMODE,
+                                    null, null, image, true);
+                                sphere.material.diffuseTexture = texture;
+                            };
+                        })(f);
+                        // Read in the image file as a data URL.
+                        reader.readAsDataURL(f);
+                        <!-- #endregion -->
+
+                        // STL
+                        <!-- #region fold -->
+                    } else if (f.name.slice(f.name.length - 3) == "stl") {
+
+                        // TO DO: differentiate between STL, OBJ, FBX etc.
+                        //var fileNameSTL = f.name;
+                        listNamesSTLs.push(f.name);
+
+                        var reader = new FileReader();
+
+                        // Upload STLs
+                        reader.onload = (function(theFile) {
+                            return function (e) {
+                                //e.target.result can be copy and pasted into a babylonJS file
+                                //console.log("e.target.result STL")
+                                //console.log(e.target.result)
+                                var base64_model_content = e.target.result; // STL file in base64
+                                var raw_content = BABYLON.Tools.DecodeBase64(base64_model_content);
+                                var blob = new Blob([raw_content]);
+                                var url = URL.createObjectURL(blob);
+
+                                listSTLURL.push(url)
+                                console.log(listSTLURL)
+                                BABYLON.SceneLoader.Append("", url, scene, function () {
+                                    scene.createDefaultCamera(true, true, true);
+                                }, undefined, undefined, ".stl");
+
+
+                                //createScene("https://dl.dropbox.com/s/m3kfo74yoik3ivh/248_Blood%20Vessels.stl", "248_Blood Vessels.stl");
+                            };
+                        })(f);
+                        console.log("reader")
+                        console.log(reader.onload)
+                        reader.readAsDataURL(f);
+                        <!-- #endregion -->
+
+                        // DICOM
+                    } else if (f.name.slice(f.name.length - 3) == "dcm") {
+
+                        // dumpDataSet. Takes dicom data, extracts STL and name, and displays it. Returns listSTLURL.
+                        <!-- #region fold -->
+                        function dumpDataSet(dataSet, output)  // (dicom data, empty array)
+                        {
+                            function getTag(tag)
+                            {
+                                var group = tag.substring(1,5); // 0042
+                                var element = tag.substring(5,9);  // 0011
+                                var tagIndex = ("("+group+","+element+")").toUpperCase();
+                                var attr = TAG_DICT[tagIndex]; // Uses dataDictionary.js
+                                return attr;
+                            }
+
+                            try{
+                                var keys = [];
+                                for(var propertyName in dataSet.elements) {
+                                    keys.push(propertyName);
+                                }
+                                keys.sort();
+
+                                // the dataSet.elements object contains properties for each element parsed.  The name of the property
+                                // is based on the elements tag and looks like 'xGGGGEEEE' where GGGG is the group number and EEEE is the
+                                // element number both with lowercase hexadecimal letters.  For example, the Series Description DICOM element 0008,103E would
+                                // be named 'x0008103e'.  Here we iterate over each property (element) so we can build a string describing its
+                                // contents to add to the output array
+                                for(var k=0; k < keys.length; k++) {
+                                    //TO DO: add more info from tags to get a better filename
+                                    var propertyName = keys[k];
+                                    var element = dataSet.elements[propertyName];
+
+                                    if(element.tag <= "x0002ffff") {
+                                        continue;
+                                    }
+                                    if(dicomParser.isPrivateTag(element.tag)) {
+                                        continue;
+                                    }
+                                    if(element.length <= 0) {
+                                        continue;
+                                    }
+
+                                    var tag = getTag(element.tag); //getTag(element.tag).tag = "(0042,0011)"
+
+                                    // Get the name of the STL given by Materialise stored in tag 0042,0010 and assign to var stlName
+                                    if (tag.tag == "(0042,0010)") {
+
+                                        var data = dicomParser.sharedCopy(dataSet.byteArray, element.dataOffset, element.length);
+
+                                        // Utf8ArrayToStr(array)
+
+                                        // https://stackoverflow.com/questions/8936984/uint8array-to-string-in-javascript
+                                        function Utf8ArrayToStr(array) {
+                                            var out, i, len, c;
+                                            var char2, char3;
+
+                                            out = "";
+                                            len = array.length;
+                                            i = 0;
+                                            while(i < len) {
+                                                c = array[i++];
+                                                switch(c >> 4)
+                                                {
+                                                  case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7:
+                                                    // 0xxxxxxx
+                                                    out += String.fromCharCode(c);
+                                                    break;
+                                                  case 12: case 13:
+                                                    // 110x xxxx   10xx xxxx
+                                                    char2 = array[i++];
+                                                    out += String.fromCharCode(((c & 0x1F) << 6) | (char2 & 0x3F));
+                                                    break;
+                                                  case 14:
+                                                    // 1110 xxxx  10xx xxxx  10xx xxxx
+                                                    char2 = array[i++];
+                                                    char3 = array[i++];
+                                                    out += String.fromCharCode(((c & 0x0F) << 12) |
+                                                                   ((char2 & 0x3F) << 6) |
+                                                                   ((char3 & 0x3F) << 0));
+                                                    break;
+                                                }
+                                            }
+                                            return out;
+                                        }
+                                        var stlName = Utf8ArrayToStr(data); // Name given by Materialise, eg "Skull and spine 1 "
+                                    }
+
+                                    if (tag.tag == "(0042,0011)") {
+
+                                    // The output string begins with the element name (or tag if not in data dictionary), length and VR (if present).  VR is undefined for
+                                    // implicit transfer syntaxes
+
+                                        <!--#region fold -->
+
+                                        function downloadData(data) {
+                                            //var blob = new Blob([data], {type: 'application/octet-stream'}); //"data" will be the STL content, and the content type "application/octet-stream" is a binary file
+                                            var blob = new Blob([data]); //"type" is not necessary
+                                            var objectURL = URL.createObjectURL(blob); //creates URL that is the download link
+
+                                            // Display STL in scene
+                                            /*
+                                            BABYLON.SceneLoader.Append("", objectURL, scene, function () {
+                                                scene.createDefaultCamera(true, true, true);
+                                            }, undefined, undefined, ".stl");
+                                            */
+                                            return objectURL
+                                        }
+
+                                        var data = dicomParser.sharedCopy(dataSet.byteArray, element.dataOffset, element.length); // 7. dicomParser extracting the STL from the DICM
+                                        // 'data' should be all that is needed for getting STL into 2D viewer
+                                        //var sopInstanceUid = dataSet.string('x00080018'); // The tag x00080018 Uniquely identifies the SOP Instance (e.g. a specific CT image)
+                                        //var fileName = stlName + " - " + sopInstanceUid + "-" + element.tag + "-" + element.dataOffset + ":" + element.length + ".stl"; ////name given to download file.
+                                        //var fileName = stlName + ".stl"; //name given to download file.
+
+                                        newURL = downloadData(data);
+                                        //listNamesSTLs.push(stlName)
+
+                                    }
+                                }
+                            } catch(err) {
+                                var ex = {
+                                    exception: err,
+                                    output: output
+                                }
+                                throw ex;
+                            }
+                            return [newURL, stlName]
+                        }
+                        <!-- #endregion -->
+
+
+                        var reader2 = new FileReader(); //  FileReader object lets web applications asynchronously read the contents of files, in this case the object "file"
+
+                        reader2.onload = function(f) {
+                            // This function knows about variables that exist in parent function "loadFiles"
+                            var arrayBuffer = reader2.result;
+
+                            // Here we have the file data as an ArrayBuffer.  dicomParser requires as input a Uint8Array so we create that here
+                            var byteArray = new Uint8Array(arrayBuffer);
+
+                            // set a short timeout to do the parse so the DOM has time to update itself with the above message
+                            function getDataSet() {
+
+                                // Invoke the parseDicom function and get back a DataSet object with the contents
+                                try {
+                                    var options = {
+                                        untilTag: untilTag
+                                    };
+
+                                    //console.log(byteArray)
+                                    dataSet = dicomParser.parseDicom(byteArray, options); //Separates data in byteArray to different DICOM tags under "elements" and stores into dataSet
+                                    //console.log(dataSet);
+
+                                    // Here we call dumpDataSet to recursively iterate through the DataSet and display the STL
+                                    var output = [];
+                                    var newURLandName = dumpDataSet(dataSet, output);
+                                    //console.log("newURL 1")
+                                    //console.log(newURL)
+
+                                    // Combine the array of strings into one string and add it to the DOM
+                                    //document.getElementById('dropZone').innerHTML = '<ul>' + output.join('') + '</ul>';
+                                }
+                            // Errors
+                            catch(err)
+                                {
+                                }
+                                return newURLandName;
+                            };
+                            let newURLandName = getDataSet();
+                            listSTLURL.push(newURLandName[0]);
+                            listNamesSTLs.push(newURLandName[1]);
+
+                            if (listSTLURL.length == files.length) {
+                                callback(listSTLURL, listNamesSTLs);
+                            };
+                        };
+                        //readAsArrayBuffer() method is used to start reading the contents of a specified Blob or File. When the read operation is finished, the readyState becomes DONE,
+                        //and the loadend (reader.onload) is triggered. At that time, the result attribute contains an ArrayBuffer representing the file's data.
+                        reader2.readAsArrayBuffer(f);
+                    }
+                } // end of for loop
+            }
+
+            // handleFileSelect is called by the "Choose Files" button
+            function handleFileSelect(evt) {
+                function completedResult(listSTLURL, listNamesSTLs) {
+                    console.log("in function completeResult")
+                    console.log(listSTLURL)
+                    console.log(listNamesSTLs)
+
+                    var assetsManager = new BABYLON.AssetsManager(scene);
+
+
+
+                    //getMeshFromArray(listNamesSTLs[0], listSTLURL[0]) not allowed to load local resource
+                    for (i = 0, len = listSTLURL.length; i < len; i++) {
+                        console.log(i)
+                        var meshTask = assetsManager.addMeshTask("skull task", "", listSTLURL[i], listNamesSTLs[i]);
+                        meshTask.onSuccess = function (task) {
+                            task.loadedMeshes[0].position = new BABYLON.Vector3(0, 0, 0);
+                        }
+                        assetsManager.onFinish = function (tasks) {
+                            engine.runRenderLoop(function () {
+                                scene.render();
+                            });
+                        };
+                        assetsManager.load();
+                        //BABYLON.SceneLoader.Append("", listSTLURL[i], scene, function () {
+                        //    scene.createDefaultCamera(true, true, true);
+                        //}, undefined, undefined, ".stl");
+                    }
+                }
+                var files = evt.target.files; // FileList object
+
+                loadFiles(files, completedResult);
+
+                //$('#upload').remove();
+            }
+
+            return scene;
+        }; // End of createScene
+
+
+<!-- #region fold -->
+
+        var engine;
+        try {
+            engine = createDefaultEngine();
+        } catch(e) {
+            console.log("the available createEngine function failed. Creating the default engine instead");
+            engine = createDefaultEngine();
+        }
+        if (!engine) throw 'engine should not be null.';
+        scene = createScene();
+        sceneToRender = scene
+
+        engine.runRenderLoop(function () {
+            if (sceneToRender) {
+                sceneToRender.render();
+            }
+        });
+
+        // Resize
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+
+    </script>
+</body>
+</html>
+<!-- #endregion -->

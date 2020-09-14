@@ -22,7 +22,7 @@
 <div class="container">
 
     <div>
-        <h1>DICOM <a href="Single Artery Template.html">Dump</a> with Data Dictionary v<span id="version"></span></h1>
+        <h1>DICOM Dump with Data Dictionary v<span id="version"></span></h1>
         <p class="lead">
             DICOM files dropped here are not uploaded anywhere, all processing
             is done inside your web browser in Javascript.
@@ -55,6 +55,7 @@
 <!-- Javascript setup -->
 <!--#region fold -->
 <!-- include the dicomParser library -->
+
 <script src="../../dist/dicomParser.js"></script>
 <script>window.dicomParser || document.write('<script src="https://unpkg.com/dicom-parser">\x3C/script>')</script>
 
@@ -72,6 +73,10 @@
 
 <!-- include Rusha for SHA1 hashing -->
 <script src="../rusha.min.js"></script>
+
+<!-- #endregion -->
+<!-- script start -->
+<!--#region fold -->
 
 <script>
 
@@ -229,43 +234,6 @@ function dumpDataSet(dataSet, output)  ////(dicom data, empty array)
             // The output string begins with the element name (or tag if not in data dictionary), length and VR (if present).  VR is undefined for
             // implicit transfer syntaxes
 
-            /* tag undefined
-            <!-- #region fold-->
-                if (tag === undefined) {
-                    //console.log('tag undefined')
-                    text += element.tag;
-                    text += " : ";
-
-                    var lengthText = "length=" + element.length;
-                    if (element.hadUndefinedLength) {
-                        lengthText += " (-1)";
-                    }
-                    if(showLength === true) {
-                        text += lengthText + "; ";
-                    }
-
-                    title += lengthText;
-
-                    var vrText = "";
-                    if (element.vr) {
-                        vrText += "VR=" + element.vr;
-                    }
-
-                    if(showVR) {
-                        text += vrText + "; ";
-                    }
-                    if(vrText) {
-                        title += "; " + vrText;
-                    }
-
-                    title += "; dataOffset=" + element.dataOffset;
-                    // make text lighter since this is an unknown attribute
-                    color = '#C8C8C8';
-                }
-                else {
-                <!-- #endregion -->
-                */
-
                 text += tag.name + " : "; //"EncapsulatedDocument :"
 
                 var lengthText = " length=" + element.length;
@@ -273,275 +241,6 @@ function dumpDataSet(dataSet, output)  ////(dicom data, empty array)
 
                 var vrText = "";
                 var vr = tag.vr; //this line is needed to avoid a certain error
-
-                // Not useful becuase No element.items or element.fragments
-                <!-- #region fold -->
-                // Here we check for Sequence items and iterate over them if present.  items will not be set in the
-                // element object for elements that don't have SQ VR type.  Note that implicit little endian
-                // sequences will are currently not parsed.
-
-
-                //if (element.items) {
-                    /*
-                    output.push('<li>' + text + '</li>');
-                    output.push('<ul>');
-
-                    // each item contains its own data set so we iterate over the items
-                    // and recursively call this function
-                    var itemNumber = 0;
-                    element.items.forEach(function (item) {
-                        output.push('<li>Item #' + itemNumber++ + ' ' + item.tag);
-                        var lengthText = " length=" + item.length;
-                        if (item.hadUndefinedLength) {
-                            lengthText += " (-1)";
-                        }
-
-                        if(showLength === true) {
-                            text += lengthText + "; ";
-                            output.push(lengthText);
-                        }
-                        output.push('</li>');
-                        output.push('<ul>');
-                        dumpDataSet(item.dataSet, output);
-                        output.push('</ul>');
-                    });
-                    output.push('</ul>');
-                    */
-                //}
-                /*
-                else if (element.fragments) {
-                    text += "encapsulated pixel data with " + element.basicOffsetTable.length + " offsets and " +
-                            element.fragments.length + " fragments";
-                    text += sha1Text(dataSet.byteArray, element.dataOffset, element.length);
-
-                    output.push("<li title='" + title + "'=>" + text + '</li>');
-
-                    if(showFragments && element.encapsulatedPixelData) {
-                        output.push('Fragments:<br>');
-                        output.push('<ul>');
-                        var itemNumber = 0;
-                        element.fragments.forEach(function (fragment) {
-                            var str = '<li>Fragment #' + itemNumber++ + ' dataOffset = ' + fragment.position;
-                            str += '; offset = ' + fragment.offset;
-                            str += '; length = ' + fragment.length ;
-                            str += sha1Text(dataSet.byteArray, fragment.position, fragment.length);
-                            str += '</li>';
-
-                            output.push(str);
-                        });
-                        output.push('</ul>');
-                    }
-                    if(showFrames && element.encapsulatedPixelData) {
-                        output.push('Frames:<br>');
-                        output.push('<ul>');
-                        var bot = element.basicOffsetTable;
-                        // if empty bot and not RLE, calculate it
-                        if(bot.length === 0) {
-                            bot = dicomParser.createJPEGBasicOffsetTable(dataSet, element);
-                        }
-                        // found no use
-                    //    function imageFrameLink(frameIndex) {
-                    //        var linkText = "<a class='imageFrameDownload' ";
-                    //        linkText += "data-frameIndex='" + frameIndex + "'";
-                    //        linkText += " href='#'> Frame #" + frameIndex + "</a>";
-                    //        return linkText;
-                    //    }
-
-                        for(var frameIndex=0; frameIndex < bot.length; frameIndex++) {
-                            var str = "<li>";
-                            str += imageFrameLink(frameIndex, "Frame #" + frameIndex);
-                            str += ' dataOffset = ' + (element.fragments[0].position + bot[frameIndex]);
-                            str += '; offset = ' + (bot[frameIndex]);
-                            var imageFrame = dicomParser.readEncapsulatedImageFrame(dataSet, element, frameIndex, bot);
-                            str += '; length = ' + imageFrame.length ;
-                            str += sha1Text(imageFrame);
-                            str += '</li>';
-                            output.push(str);
-                        }
-                        output.push('</ul>');
-                    }
-                }
-                */
-
-                //else {
-                    // use VR to display the right value
-
-
-                    /*
-                    if (element.vr !== undefined) {
-                        vr = element.vr;
-                        console.log("element.vr")
-                    }
-                    else {
-                        if (tag !== undefined) {
-                            vr = tag.vr;
-                            console.log("tag.vr")
-                        }
-                    }
-                    */
-                    // if the length of the element is less than 128 we try to show it.  We put this check in
-                    // to avoid displaying large strings which makes it harder to use.
-
-                    // Since the STL will not be less than 128, this section isn't useful
-                    /*
-                    <!--#region fold -->
-                    if (element.length < maxLength) {
-
-                        // Since the dataset might be encoded using implicit transfer syntax and we aren't using
-                        // a data dictionary, we need some simple logic to figure out what data types these
-                        // elements might be.  Since the dataset might also be explicit we could be switch on the
-                        // VR and do a better job on this, perhaps we can do that in another example
-
-                        // First we check to see if the element's length is appropriate for a UI or US VR.
-                        // US is an important type because it is used for the
-                        // image Rows and Columns so that is why those are assumed over other VR types.
-                        if (element.vr === undefined && tag === undefined) {
-                            if (element.length === 2) {
-                                text += " (" + dataSet.uint16(propertyName) + ")";
-                            }
-                            else if (element.length === 4) {
-                                text += " (" + dataSet.uint32(propertyName) + ")";
-                            }
-
-
-                            // Next we ask the dataset to give us the element's data in string form.  Most elements are
-                            // strings but some aren't so we do a quick check to make sure it actually has all ascii
-                            // characters so we know it is reasonable to display it.
-                            var str = dataSet.string(propertyName);
-                            var stringIsAscii = isASCII(str);
-
-                            if (stringIsAscii) {
-                                // the string will be undefined if the element is present but has no data
-                                // (i.e. attribute is of type 2 or 3 ) so we only display the string if it has
-                                // data.  Note that the length of the element will be 0 to indicate "no data"
-                                // so we don't put anything here for the value in that case.
-                                if (str !== undefined) {
-                                    text += '"' + str + '"' + mapUid(str);
-                                }
-                            }
-                            else {
-                                if (element.length !== 2 && element.length !== 4) {
-                                    color = '#C8C8C8';
-                                    // If it is some other length and we have no string
-                                    text += "<i>binary data</i>";
-                                }
-                            }
-                        }
-                        else {
-                            function isStringVr(vr) {
-                                if (vr === 'AT'
-                                        || vr === 'FL'
-                                        || vr === 'FD'
-                                        || vr === 'OB'
-                                        || vr === 'OF'
-                                        || vr === 'OW'
-                                        || vr === 'SI'
-                                        || vr === 'SQ'
-                                        || vr === 'SS'
-                                        || vr === 'UL'
-                                        || vr === 'US'
-                                ) {
-                                    return false;
-                                }
-                                return true;
-                            }
-                            if (isStringVr(vr)) {
-                                // Next we ask the dataset to give us the element's data in string form.  Most elements are
-                                // strings but some aren't so we do a quick check to make sure it actually has all ascii
-                                // characters so we know it is reasonable to display it.
-                                var str = dataSet.string(propertyName);
-                                var stringIsAscii = isASCII(str);
-
-                                if (stringIsAscii) {
-                                    // the string will be undefined if the element is present but has no data
-                                    // (i.e. attribute is of type 2 or 3 ) so we only display the string if it has
-                                    // data.  Note that the length of the element will be 0 to indicate "no data"
-                                    // so we don't put anything here for the value in that case.
-                                    if (str !== undefined) {
-                                        text += '"' + str + '"' + mapUid(str);
-                                    }
-                                }
-                                else {
-                                    if (element.length !== 2 && element.length !== 4) {
-                                        color = '#C8C8C8';
-                                        // If it is some other length and we have no string
-                                        text += "<i>binary data</i>";
-                                    }
-                                }
-                            }
-                            else if (vr === 'US') {
-                                text += dataSet.uint16(propertyName);
-                                for(var i=1; i < dataSet.elements[propertyName].length/2; i++) {
-                                    text += '\\' + dataSet.uint16(propertyName, i);
-                                }
-                            }
-                            else if (vr === 'SS') {
-                                text += dataSet.int16(propertyName);
-                                for(var i=1; i < dataSet.elements[propertyName].length/2; i++) {
-                                    text += '\\' + dataSet.int16(propertyName, i);
-                                }
-                            }
-                            else if (vr === 'UL') {
-                                text += dataSet.uint32(propertyName);
-                                for(var i=1; i < dataSet.elements[propertyName].length/4; i++) {
-                                    text += '\\' + dataSet.uint32(propertyName, i);
-                                }
-                            }
-                            else if (vr === 'SL') {
-                                text += dataSet.int32(propertyName);
-                                for(var i=1; i < dataSet.elements[propertyName].length/4; i++) {
-                                    text += '\\' + dataSet.int32(propertyName, i);
-                                }
-                            }
-                            else if (vr == 'FD') {
-                                text += dataSet.double(propertyName);
-                                for(var i=1; i < dataSet.elements[propertyName].length/8; i++) {
-                                    text += '\\' + dataSet.double(propertyName, i);
-                                }
-                            }
-                            else if (vr == 'FL') {
-                                text += dataSet.float(propertyName);
-                                for(var i=1; i < dataSet.elements[propertyName].length/4; i++) {
-                                    text += '\\' + dataSet.float(propertyName, i);
-                                }
-                            }
-                            else if (vr === 'OB' || vr === 'OW' || vr === 'UN' || vr === 'OF' || vr === 'UT') {
-                                color = '#C8C8C8';
-                                // If it is some other length and we have no string
-                                if(element.length === 2) {
-                                    text += "<i>" + dataDownloadLink(element, "binary data") + " of length " + element.length + " as uint16: " +dataSet.uint16(propertyName);
-                                } else if(element.length === 4) {
-                                    text += "<i>" + dataDownloadLink(element, "binary data") + " of length " + element.length + " as uint32: " +dataSet.uint32(propertyName);
-                                } else {
-                                    text += "<i>" + dataDownloadLink(element, "binary data") + " of length " + element.length + " and VR " + vr + "</i>";
-                                }
-                            }
-                            else if(vr === 'AT') {
-                                var group = dataSet.uint16(propertyName, 0);
-                                var groupHexStr = ("0000" + group.toString(16)).substr(-4);
-                                var element = dataSet.uint16(propertyName, 1);
-                                var elementHexStr = ("0000" + element.toString(16)).substr(-4);
-                                text += "x" + groupHexStr + elementHexStr;
-                            }
-                            else if(vr === 'SQ') {
-                            }
-                            else {
-                                // If it is some other length and we have no string
-                                text += "<i>no display code for VR " + vr + " yet, sorry!</i>";
-                            }
-                        }
-
-                        if (element.length === 0) {
-                            color = '#C8C8C8';
-                        }
-                    }
-                    <!-- #endregion -->
-                    */
-
-                    //else {
-                    <!-- #endregion -->
-
-
 
                 // Add text saying the data is too long to show...
                 text += "<i>" + dataDownloadLink(element, "Download STL");  //////////////////////// Line with download link
@@ -597,9 +296,9 @@ function dumpFile()
     $('#warnings').empty();
     document.getElementById('statusText').innerHTML = 'Status: Loading file, please wait..';
 
-    var reader = new FileReader(); //  FileReader object lets web applications asynchronously read the contents of files, in this case the object "file"
-    reader.onload = function(file) {
-        var arrayBuffer = reader.result;
+    var reader2 = new FileReader(); //  FileReader object lets web applications asynchronously read the contents of files, in this case the object "file"
+    reader2.onload = function(file) {
+        var arrayBuffer = reader2.result;
         // Here we have the file data as an ArrayBuffer.  dicomParser requires as input a
         // Uint8Array so we create that here
         var byteArray = new Uint8Array(arrayBuffer);
@@ -649,7 +348,7 @@ function dumpFile()
                     var tag = $(ev.currentTarget).attr('data-tag'); // Tag we're looking for is "x00420011"
                     var dataOffset = parseInt($(ev.currentTarget).attr('data-dataOffset'));
                     var length = parseInt($(ev.currentTarget).attr('data-length'));
-                    var data = dicomParser.sharedCopy(dataSet.byteArray, dataOffset, length); //////////////////////////// dicomParser extracting the STL from the DICM
+                    var data = dicomParser.sharedCopy(dataSet.byteArray, dataOffset, length); ///////// dicomParser extracting the STL from the DICM - base64_model_content
                     var sopInstanceUid = dataSet.string('x00080018'); // The tag x00080018 Uniquely identifies the SOP Instance (e.g. a specific CT image)
                     var fileName = sopInstanceUid + "-" + tag + "-" + dataOffset + ":" + length + ".stl"; ////////////////////name given to download file.
                     downloadData(data,fileName);
@@ -718,7 +417,7 @@ function dumpFile()
         },10);
     };
 
-    reader.readAsArrayBuffer(file);
+    reader2.readAsArrayBuffer(file);
 }
 
 // Drop zone code. Assigns dropped file to variable "file" and runs function dumpFile()
@@ -733,7 +432,7 @@ function handleFileSelect(evt) { // tgets called once the user drops the file on
     var files = evt.dataTransfer.files;
 
     // this UI is only built for a single file so just dump the first one
-    file = files[0] // Assigns varaible file to the imported data for use in the dumpFile() function
+    file = files[0] // Assigns variable file to the imported data for use in the dumpFile() function. "f" in 2d viewer
     dumpFile();
 }
 
