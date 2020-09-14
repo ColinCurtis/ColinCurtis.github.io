@@ -618,23 +618,10 @@
                     console.log(listSTLURL)
                     console.log(listNamesSTLs)
 
-                    var assetsManager = new BABYLON.AssetsManager(scene);
-
-
-
                     //getMeshFromArray(listNamesSTLs[0], listSTLURL[0]) not allowed to load local resource
                     for (i = 0, len = listSTLURL.length; i < len; i++) {
                         console.log(i)
-                        var meshTask = assetsManager.addMeshTask("skull task", "", listSTLURL[i], listNamesSTLs[i]);
-                        meshTask.onSuccess = function (task) {
-                            task.loadedMeshes[0].position = new BABYLON.Vector3(0, 0, 0);
-                        }
-                        assetsManager.onFinish = function (tasks) {
-                            engine.runRenderLoop(function () {
-                                scene.render();
-                            });
-                        };
-                        assetsManager.load();
+                        getMeshFromArray(listNamesSTLs[i], listSTLURL[i])
                         //BABYLON.SceneLoader.Append("", listSTLURL[i], scene, function () {
                         //    scene.createDefaultCamera(true, true, true);
                         //}, undefined, undefined, ".stl");
