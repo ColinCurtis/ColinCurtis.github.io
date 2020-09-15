@@ -95,7 +95,7 @@
         <!-- #endregion -->
 
         // Create BabylonJS Scene
-        var createScene = function (url1, name1) {
+        var createScene = function () {
             var scene = new BABYLON.Scene(engine);
 
             // Camera
@@ -360,8 +360,10 @@
                 makeGUI();
             };
 
+
             makeEverything(meshList, urlList);
 
+            // Functions to run using "Choose Files" button
             function loadFiles(files, callback) {
                 var listNamesSTLs = [];
                 var listSTLURL = [];
@@ -374,7 +376,7 @@
                         // Image
                         <!-- #region fold -->
                     } else if (f.type.match('image.*')) {
-                        var reader = new FileReader();
+                        let reader = new FileReader();
 
                         // Closure to capture the file information.
                         reader.onload = (function(theFile) {
@@ -396,41 +398,29 @@
                     } else if (f.name.slice(f.name.length - 3) == "stl") {
 
                         // TO DO: differentiate between STL, OBJ, FBX etc.
-                        //var fileNameSTL = f.name;
                         listNamesSTLs.push(f.name);
 
-                        var reader = new FileReader();
-
-                        // Upload STLs
+                        let reader = new FileReader();
                         reader.onload = (function(theFile) {
                             return function (e) {
-                                //e.target.result can be copy and pasted into a babylonJS file
-                                //console.log("e.target.result STL")
-                                //console.log(e.target.result)
+                                //e.target.result can be copy and pasted into a babylonJS file so nothing external needs to be loaded
                                 var base64_model_content = e.target.result; // STL file in base64
                                 var raw_content = BABYLON.Tools.DecodeBase64(base64_model_content);
                                 var blob = new Blob([raw_content]);
                                 var url = URL.createObjectURL(blob);
 
                                 listSTLURL.push(url)
-                                console.log(listSTLURL)
-                                BABYLON.SceneLoader.Append("", url, scene, function () {
-                                    scene.createDefaultCamera(true, true, true);
-                                }, undefined, undefined, ".stl");
-
-
-                                //createScene("https://dl.dropbox.com/s/m3kfo74yoik3ivh/248_Blood%20Vessels.stl", "248_Blood Vessels.stl");
                             };
                         })(f);
-                        console.log("reader")
-                        console.log(reader.onload)
+                        //console.log("reader")
+                        //console.log(reader.onload)
                         reader.readAsDataURL(f);
                         <!-- #endregion -->
 
                         // DICOM
                     } else if (f.name.slice(f.name.length - 3) == "dcm") {
 
-                        // dumpDataSet. Takes dicom data, extracts STL and name, and displays it. Returns listSTLURL.
+                        // dumpDataSet. Takes dicom data, extracts STL and name. Returns listSTLURL.
                         <!-- #region fold -->
                         function dumpDataSet(dataSet, output)  // (dicom data, empty array)
                         {
@@ -450,11 +440,12 @@
                                 }
                                 keys.sort();
 
-                                // the dataSet.elements object contains properties for each element parsed.  The name of the property
+                                /* the dataSet.elements object contains properties for each element parsed.  The name of the property
                                 // is based on the elements tag and looks like 'xGGGGEEEE' where GGGG is the group number and EEEE is the
                                 // element number both with lowercase hexadecimal letters.  For example, the Series Description DICOM element 0008,103E would
                                 // be named 'x0008103e'.  Here we iterate over each property (element) so we can build a string describing its
-                                // contents to add to the output array
+                                // contents to add to the output array */
+
                                 for(var k=0; k < keys.length; k++) {
                                     //TO DO: add more info from tags to get a better filename
                                     var propertyName = keys[k];
@@ -520,19 +511,12 @@
                                     // The output string begins with the element name (or tag if not in data dictionary), length and VR (if present).  VR is undefined for
                                     // implicit transfer syntaxes
 
-                                        <!--#region fold -->
-
                                         function downloadData(data) {
                                             //var blob = new Blob([data], {type: 'application/octet-stream'}); //"data" will be the STL content, and the content type "application/octet-stream" is a binary file
                                             var blob = new Blob([data]); //"type" is not necessary
                                             var objectURL = URL.createObjectURL(blob); //creates URL that is the download link
-
-                                            // Display STL in scene
-                                            /*
-                                            BABYLON.SceneLoader.Append("", objectURL, scene, function () {
-                                                scene.createDefaultCamera(true, true, true);
-                                            }, undefined, undefined, ".stl");
-                                            */
+                                            console.log("objectURL")
+                                            console.log(objectURL)
                                             return objectURL
                                         }
 
@@ -558,58 +542,53 @@
                         }
                         <!-- #endregion -->
 
+                        let reader = new FileReader(); //  FileReader object lets web applications asynchronously read the contents of files, in this case the object "file"
 
-                        var reader2 = new FileReader(); //  FileReader object lets web applications asynchronously read the contents of files, in this case the object "file"
+                        reader.onload = (function(theFile) {
+                            return function (e) {
+                                // This function knows about variables that exist in parent function "loadFiles"
+                                var arrayBuffer = e.target.result;
 
-                        reader2.onload = function(f) {
-                            // This function knows about variables that exist in parent function "loadFiles"
-                            var arrayBuffer = reader2.result;
+                                // Here we have the file data as an ArrayBuffer.  dicomParser requires as input a Uint8Array so we create that here
+                                var byteArray = new Uint8Array(arrayBuffer);
 
-                            // Here we have the file data as an ArrayBuffer.  dicomParser requires as input a Uint8Array so we create that here
-                            var byteArray = new Uint8Array(arrayBuffer);
+                                function getDataSet() {
+                                    // Invoke the parseDicom function and get back a DataSet object with the contents
+                                    try {
+                                        var options = {
+                                            untilTag: untilTag
+                                        };
 
-                            // set a short timeout to do the parse so the DOM has time to update itself with the above message
-                            function getDataSet() {
+                                        dataSet = dicomParser.parseDicom(byteArray, options); //Separates data in byteArray to different DICOM tags under "elements" and stores into dataSet
 
-                                // Invoke the parseDicom function and get back a DataSet object with the contents
-                                try {
-                                    var options = {
-                                        untilTag: untilTag
-                                    };
+                                        // Here we call dumpDataSet to recursively iterate through the DataSet
+                                        var output = [];
+                                        var newURLandName = dumpDataSet(dataSet, output);
 
-                                    //console.log(byteArray)
-                                    dataSet = dicomParser.parseDicom(byteArray, options); //Separates data in byteArray to different DICOM tags under "elements" and stores into dataSet
-                                    //console.log(dataSet);
+                                        // Combine the array of strings into one string and add it to the DOM
+                                        //document.getElementById('dropZone').innerHTML = '<ul>' + output.join('') + '</ul>';
+                                    }
+                                // Errors
+                                catch(err)
+                                    {
+                                    }
+                                    return newURLandName;
+                                };
+                                let newURLandName = getDataSet();
+                                listSTLURL.push(newURLandName[0]);
+                                listNamesSTLs.push(newURLandName[1]);
 
-                                    // Here we call dumpDataSet to recursively iterate through the DataSet and display the STL
-                                    var output = [];
-                                    var newURLandName = dumpDataSet(dataSet, output);
-                                    //console.log("newURL 1")
-                                    //console.log(newURL)
-
-                                    // Combine the array of strings into one string and add it to the DOM
-                                    //document.getElementById('dropZone').innerHTML = '<ul>' + output.join('') + '</ul>';
-                                }
-                            // Errors
-                            catch(err)
-                                {
-                                }
-                                return newURLandName;
+                                if (listSTLURL.length == files.length) {
+                                    callback(listSTLURL, listNamesSTLs); // completedResult
+                                };
                             };
-                            let newURLandName = getDataSet();
-                            listSTLURL.push(newURLandName[0]);
-                            listNamesSTLs.push(newURLandName[1]);
-
-                            if (listSTLURL.length == files.length) {
-                                callback(listSTLURL, listNamesSTLs);
-                            };
-                        };
+                        })(f);
                         //readAsArrayBuffer() method is used to start reading the contents of a specified Blob or File. When the read operation is finished, the readyState becomes DONE,
                         //and the loadend (reader.onload) is triggered. At that time, the result attribute contains an ArrayBuffer representing the file's data.
-                        reader2.readAsArrayBuffer(f);
+                        reader.readAsArrayBuffer(f);
                     }
                 } // end of for loop
-            }
+            } // end of loadFiles function
 
             // handleFileSelect is called by the "Choose Files" button
             function handleFileSelect(evt) {
@@ -621,17 +600,16 @@
                     //getMeshFromArray(listNamesSTLs[0], listSTLURL[0]) not allowed to load local resource
                     for (i = 0, len = listSTLURL.length; i < len; i++) {
                         console.log(i)
-                        getMeshFromArray(listNamesSTLs[i], listSTLURL[i])
-                        //BABYLON.SceneLoader.Append("", listSTLURL[i], scene, function () {
-                        //    scene.createDefaultCamera(true, true, true);
-                        //}, undefined, undefined, ".stl");
+
+                        BABYLON.SceneLoader.Append("", listSTLURL[i], scene, function () {
+                            scene.createDefaultCamera(true, true, true);
+                        }, undefined, undefined, ".stl");
                     }
+                    //makeEverything(listNamesSTLs, listSTLURL)
                 }
                 var files = evt.target.files; // FileList object
 
                 loadFiles(files, completedResult);
-
-                //$('#upload').remove();
             }
 
             return scene;
