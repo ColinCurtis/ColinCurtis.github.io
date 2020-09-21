@@ -112,58 +112,184 @@
             // Mesh importing
             <!-- #region fold -->
 
-            // Namify cleans up names for labeling. Expects STL file name structure to be <number>_<name>.<extension (length agnostic I think)>
-            function namify(rawName) {
-                rawName = /_(.+)/.exec(rawName)[1]; // Remove numbers and _ in first part of filename
-                rawName = rawName.replace(/\.[^/.]+$/, ""); // Remove extension
-                return rawName;
+            // Make usable links and names of imported meshes
+            function cleanFileNames(fileNameList) {
+                // Namify cleans up names for labeling. Expects STL filename structure to be <number>_<name>.<extension (length agnostic I think)>
+                function namify(rawNames) {
+                    rawNames = /_(.+)/.exec(rawNames)[1]; // Remove numbers and _ in first part of filename
+                    rawNames = rawNames.replace(/\.[^/.]+$/, ""); // Remove extension
+                    return rawNames;
+                };
+
+                // Rename the meshes for better labels
+                let cleanMeshNames = [];
+
+                for (i = 0, len = fileNameList.length; i < len; i++) {
+                    cleanMeshNames.push(namify(fileNameList[i]));
+                };
+                return cleanMeshNames;
             };
 
-            //***Insert array of filenames ***
-            var meshList = [];
-            //var meshList = ["236_Arteries.stl", "236_Skull bottom.stl", "236_Skull top.stl"];
-            //if (name1) {
-            //    meshList.push(name1)
-            //}
-            //console.log(meshList)
-            var urlList = [];
+            function fixURL(meshNamesToFix, urlList) {
+                let hyperlinks = urlList.slice(0); // if you make hyperlinks = urlList;, they both will reference the same array and will affect one another
+
+                function fixFileHostingURLs(meshNamesToFix, hyperlinks) {
+                    //var filenameFromURL = [];
+                    for (i = 0; i < hyperlinks.length; i++) {
+                        let url = hyperlinks[i];
+                        if (url.includes("dropbox")) {
+                            // Use window.decodeURIComponent(<string>) when file has special characters in name (ie ?,=,&,/ etc), for example this replaces %20 with a space
+                            meshNamesToFix[i] = window.decodeURIComponent(url.split("/").pop().split("?").shift()); // Filename needed for BabylonJS to append scene
+                            // BabylonJS Dropbox URL format: "https://dl.dropbox.com/s/a3kplcg15ratxmz/249_Arteries.stl" not https://www.dropbox.com/s/a3kplcg15ratxmz/249_Arteries.stl?dl=0
+                            if (url.includes("www")) {
+                                url = url.replace('www', 'dl'); // Replace first occurrence of 'www' with 'dl'
+                                hyperlinks[i] = url.substr(0, url.lastIndexOf('?')) || url; // Replace last occurrence of ? and everything after it. If not present, returns url unchanged.
+                            };
+                        };
+                    };
+                    //console.log("cleanURLList in droboxFileName")
+                    //console.log(cleanURLList)
+                    return [meshNamesToFix, hyperlinks];
+                };
+                let fixedMeshNames = [];
+                let cleanURLs = [];
+
+                [fixedMeshNames, cleanURLs] = fixFileHostingURLs(meshNamesToFix, hyperlinks); // URLs needed to be adjusted BabylonJS to load
+
+                return [fixedMeshNames, cleanURLs];
+            };
+
+            // Display meshes
+            async function getMeshFromArray(meshList, urlList) {
+                let fixedMeshNames = [];
+                let cleanURLs = [];
+                let meshNumber = scene.meshes.length;
+
+                [fixedMeshNames, cleanURLs] = fixURL(meshList, urlList);
+
+                for (var i = 0, len = cleanURLs.length; i < len; i++) {
+                    new BABYLON.StandardMaterial(fixedMeshNames[i], scene);
+                    await BABYLON.SceneLoader.AppendAsync(cleanURLs[i], fixedMeshNames[i], scene).then(function () {
+                        // Everything in this function executes after mesh is loaded, but everything outside must be told to wait to make changes to mesh
+                        let mesh = scene.meshes[meshNumber + i];
+                        mesh.name = fixedMeshNames[i];
+                        mesh.material = scene.getMaterialByName(fixedMeshNames[i]);
+
+                        // scene properties
+                        <!-- #region fold-->
+                        mesh.material.backFaceCulling = false;
+                        mesh.material.needDepthPrePass = true;
+                        mesh.forceSharedVertices(); // Shade smooth
+
+                        // Create camera framed on loaded meshes
+                        scene.createDefaultCameraOrLight(true, true, true);
+                        scene.activeCamera.speed = 1;
+                        scene.activeCamera.multiTouchPanAndZoom = true;
+                        scene.activeCamera.inertia = 0.84;
+                        scene.activeCamera.panningSensibility = 150;
+                        <!-- #endregion-->
+                    });
+                };
+                makeGUI();
+            };
+
+            // Function used when dragging and dropping
+            function appendWithMeshes(listNamesSTLs, listSTLURL) {
+                console.log("appendWithMeshes")
+                //console.log("listNamesSTLs: " + listNamesSTLs)
+                //console.log("listSTLURL: " + listSTLURL)
+
+                async function actualImport(listNamesSTLs, listSTLURL, meshNumber, i) {
+                    await BABYLON.SceneLoader.Append("", listSTLURL[i], scene,
+                        function () {
+
+                            let mesh = scene.meshes[meshNumber + i];
+
+                            mesh.name = listNamesSTLs[i];
+                            mesh.material = scene.getMaterialByName(listNamesSTLs[i]);
+
+                            // Scene properties
+                            <!-- #region fold -->
+                            mesh.material.backFaceCulling = false;
+                            mesh.material.needDepthPrePass = true;
+                            mesh.forceSharedVertices(); // Shade smooth
+
+                            // Create camera framed on loaded meshes
+                            scene.createDefaultCameraOrLight(true, true, true);
+                            scene.activeCamera.speed = 1;
+                            scene.activeCamera.multiTouchPanAndZoom = true;
+                            scene.activeCamera.inertia = 0.84;
+                            scene.activeCamera.panningSensibility = 150;
+                            <!-- #endregion-->
+
+                            if (i === listSTLURL.length - 1) {
+                                for (let j = 0; j < listSTLURL.length; j++) {
+                                    urlList.push(listSTLURL[j]);
+                                };
+                                /*window.setTimeout(function () {
+                                    makeGUI();
+                                }, 10000);*/
+                                makeGUI();
+                            }
+                            // Code here loads after GUI is made if i is final
+
+                        },
+
+                        function() {
+                            //console.log(i)
+                            console.log("Loading " + listNamesSTLs[i] + "(" + i + ")");
+                        },
+                        function(error) {
+                            console.error("### Error loading model")
+                            console.error(error)
+                        }, ".stl");
+                    // Code here runs before code in BABYLON.SceneLoader.Append
+                };
+
+                let meshNumber = scene.meshes.length;
+                for (i = 0, len = listSTLURL.length; i < len; i++) {
+                    new BABYLON.StandardMaterial(listNamesSTLs[i], scene);
+                    actualImport(listNamesSTLs, listSTLURL, meshNumber, i);
+                    console.log("attempt " + i)
+                };
+            };
+
+            // Enter links to meshes here
+            let urlList = ["https://www.dropbox.com/s/a3kplcg15ratxmz/249_Arteries.stl?dl=0", "https://www.dropbox.com/s/9y64gkfou5iq3vj/249_Skull%20Bottom.stl?dl=0"];
+            // large stl:  "https://www.dropbox.com/s/rwwo7imdroc4fmm/0_Skull%20and%20spine%201.stl?dl=0"
+            //let urlList = ["https://www.dropbox.com/s/rwwo7imdroc4fmm/0_Skull%20and%20spine%201.stl?dl=0"];
             //var urlList = ["https://dl.dropbox.com/s/vsx2rjsohz0n0ne/236_Arteries.stl", "https://dl.dropbox.com/s/k8c148mspznpaot/236_Skull%20bottom.stl", "https://dl.dropbox.com/s/watabn3g4kzqu3h/236_Skull%20top.stl"];
-            //if (url1) {
-            //    urlList.push(url1)
-            //    console.log("works")
-            //}
-            var newMeshNames = [];
 
-            // Rename the meshes for better labels
-            for (var i = 0, len = meshList.length; i < len; i++) {
-                newMeshNames.push(namify(meshList[i]));
-            };
-            console.log(newMeshNames)
+            // Enter filenames here for non-dropbox links
+            //let meshList = ["249_Arteries.stl", "249_Skull Bottom.stl"];
+            let meshList = [];
 
-            function getMeshFromArray(newMeshName, url) {
-                var importedMesh = BABYLON.SceneLoader.ImportMesh("", url, newMeshName, scene, function(newMeshes){
-                    // Everything in this function executes after mesh is loaded, but everything outside must be told to wait to make changes to mesh
-                    var mesh = newMeshes[0];
-                    mesh.name = newMeshName;
-                    mesh.material = scene.getMaterialByName(newMeshName);
-                    mesh.material.backFaceCulling = false;
-                    mesh.material.needDepthPrePass = true;
-					mesh.forceSharedVertices(); // Shade smooth
-
-					// Create camera framed on loaded meshes
-                    scene.createDefaultCameraOrLight(true, true, true);
-					scene.activeCamera.speed = 1;
-                    scene.activeCamera.multiTouchPanAndZoom = true;
-					scene.activeCamera.inertia = 0.84;
-					scene.activeCamera.panningSensibility = 150;
-                });
-            };
             <!-- #endregion -->
 
             // GUI
-            <!-- #region fold -->
-
             function makeGUI() {
+
+                let guiList = [];
+                let addedMesh = false;
+                scene.meshes.forEach(mesh => guiList.push(mesh.name));
+                console.log("urlList:")
+                for (let n = 0; n < urlList.length; n++) {
+                    console.log(urlList[n])
+                }
+
+                console.log("List of meshes 270")
+                for (i=0; i < scene.meshes.length; i++) {
+                    console.log(scene.meshes[i])
+                }
+
+                let cleanMeshNames = cleanFileNames(guiList);
+
+                console.log(scene.textures[0])
+
+                if (typeof scene.textures[0] != "undefined") {     //  If button is on when adding new mesh,
+                    scene.textures[0].dispose();                   //  the previous GUI panel is disposed of
+                    addedMesh = true;                              //  but the button will stay on
+                }
 
                 var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
                 //advancedTexture.layer.layerMask = 2; // ?
@@ -180,6 +306,7 @@
 
                 // Function to remove slider and color wheel
                 function removeSliderPicker() {
+                    console.log("removeSliderPicker")
                     if (advancedTexture.getControlByName("picker")) {
                         panel.removeControl(advancedTexture.getControlByName("pickerHeader"));
                         panel.removeControl(advancedTexture.getControlByName("picker"));
@@ -188,11 +315,12 @@
                         panel.removeControl(advancedTexture.getControlByName("sliderHeader"));
                         panel.removeControl(advancedTexture.getControlByName("slider"));
                     }
+                    console.log("end removeSliderPicker")
                 };
 
                 // Transparency and Color GUI
-                var alphaSlider = function(meshList, checked, parent) {
-
+                var alphaSlider = function(guiList, checked, parent) {
+                    console.log("alphaSlider")
                     // "Transparency"
                     var sliderText = new BABYLON.GUI.TextBlock("sliderHeader");
                     sliderText.text = "Transparency:";
@@ -217,7 +345,7 @@
                         // Go through checkboxes to see if they are checked. If they are, their alpha changes
                         for (var u = 0, len = checked.length; u < len; u++) {
                             if (checked[u]) {
-                                scene.getMaterialByName(meshList[u]).alpha = scene.getMaterialByName("temp").alpha;
+                                scene.getMaterialByName(guiList[u]).alpha = scene.getMaterialByName("temp").alpha;
                             };
                         };
                     });
@@ -227,7 +355,8 @@
 
                 };
 
-                var colorWheel = function(meshList, checked, parent) {
+                var colorWheel = function(guiList, checked, parent) {
+                    console.log("colorWheel")
                     // "Color" header
                     colorText = new BABYLON.GUI.TextBlock("pickerHeader");
                     colorText.text = "Color:";
@@ -248,7 +377,7 @@
                         // Go through checkboxes to see if they are checked. If they are, their color changes
                         for (var u = 0, len = checked.length; u < len; u++) {
                             if (checked[u]) {
-                                scene.getMaterialByName(meshList[u]).diffuseColor = scene.getMaterialByName("temp").diffuseColor;
+                                scene.getMaterialByName(guiList[u]).diffuseColor = scene.getMaterialByName("temp").diffuseColor;
                             };
                         };
                     });
@@ -257,113 +386,140 @@
                 };
 
                 // Checkboxes
-                var checkboxes = [];
-                var headers = [];
+                function addCheckboxes () {
+                    console.log("Checkboxes")
+                    var checkboxes = [];
+                    var headers = [];
 
-                for (var i = 0, len = meshList.length; i < len; i++) {
-                    checkboxes.push(new BABYLON.GUI.Checkbox(newMeshNames[i] + " Checkbox"));
-                    checkboxes[i].width = "20px";
-                    checkboxes[i].height = "20px";
-                    checkboxes[i].isChecked = false;
-                    checkboxes[i].color = "green";
+                    for (var i = 0, len = guiList.length; i < len; i++) {
+                        checkboxes.push(new BABYLON.GUI.Checkbox(guiList[i] + " Checkbox"));
+                        checkboxes[i].width = "20px";
+                        checkboxes[i].height = "20px";
+                        checkboxes[i].isChecked = false;
+                        checkboxes[i].color = "green";
 
-                    // When a checkbox is clicked, see if
-                    checkboxes[i].onIsCheckedChangedObservable.add(function(value) {
-                        var checked = [];
-                        var noneChecked = 1;
-                        removeSliderPicker();
+                        // When a checkbox is clicked, see if
+                        checkboxes[i].onIsCheckedChangedObservable.add(function(value) {
+                            var checked = [];
+                            var noneChecked = 1;
+                            removeSliderPicker();
 
-                        for (var n = 0, len = checkboxes.length; n < len; n++) {
-                            if (checkboxes[n].isChecked) {
-                                checked.push(1);
-                            } else {
-                                checked.push(0);
+                            for (var n = 0, len = checkboxes.length; n < len; n++) {
+                                if (checkboxes[n].isChecked) {
+                                    checked.push(1);
+                                } else {
+                                    checked.push(0);
+                                }
                             }
-                        }
 
-                        alphaSlider(meshList, checked, panel);
-                        colorWheel(meshList, checked, panel);
+                            alphaSlider(guiList, checked, panel);
+                            colorWheel(guiList, checked, panel);
 
-                        // If all checkboxes are unchecked, remove slider and color wheel
-                        for (var m = 0, len = checked.length; m < len; m++) {
-                            if (checked[m]) {
-                                noneChecked = 0;
+                            // If all checkboxes are unchecked, remove slider and color wheel
+                            for (var m = 0, len = checked.length; m < len; m++) {
+                                if (checked[m]) {
+                                    noneChecked = 0;
+                                }
                             }
-                        }
-                        if (noneChecked) {
-                            removeSliderPicker(); //Comment out to keep colorwheel and slider visible when everything is unchecked
-                        }
+                            if (noneChecked) {
+                                removeSliderPicker(); //Comment out to keep colorwheel and slider visible when everything is unchecked
+                            }
 
-                    });
+                        });
 
-                    headers.push(BABYLON.GUI.Control.AddHeader(checkboxes[i], newMeshNames[i], "180px", { isHorizontal: true, controlFirst: true}));
-                    headers[i].color = "white";
-                    headers[i].height = "20px";
-                    headers[i].horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                        headers.push(BABYLON.GUI.Control.AddHeader(checkboxes[i], cleanMeshNames[i], "180px", { isHorizontal: true, controlFirst: true}));
+                        headers[i].color = "white";
+                        headers[i].height = "20px";
+                        headers[i].horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                    };
+
+                    for (var i = 0, len = headers.length; i < len; i++) {
+                        panel.addControl(headers[i]);
+                    };
+                    return headers;
                 };
 
                 // "Change Colors" button that adds and removes GUI elements
-
+                console.log("button1")
                 var button1 = BABYLON.GUI.Button.CreateSimpleButton("button1", "Change Colors");
                 button1.height = "40px";
                 button1.width = 0.3;
                 button1.background = "green";
 
                 panel.addControl(button1);
+
                 var buttonOn = 1;
+
+                function addMoreControls() {
+                    // "Upload Files" button
+                    $('#upload').remove(); // Not sure if this line is needed
+                    $('body').append('<input id="upload" type="file" multiple style="position: absolute; top: 10px; left: 150px;"/>');
+                    $('#upload').on('change', handleFileSelect); // I added "<script src="jquery.min.js"> < /script>" to HTML file otherwise this doesn't work
+                    //buttonOn = 0;
+                    let headers = addCheckboxes();
+                    return 0;
+                }
+
+                if (addedMesh) {
+                    // Keeps the color change button on when adding a new mesh
+                    // Does the same thing as turning the "Change Colors" button on
+                    buttonOn = addMoreControls();
+                }
+
                 button1.onPointerUpObservable.add(function() {
 
                     if (buttonOn) {
-
-                        // "Upload Files" button
-                        $('#upload').remove(); // Not sure if this line is needed
-                        $('body').append('<input id="upload" type="file" multiple style="position: absolute; top: 10px; left: 150px;"/>');
-                        $('#upload').on('change', handleFileSelect); // I added "<script src="jquery.min.js"> < /script>" to HTML file otherwise this doesn't work
-
-                        // Checkboxes
-                        for (var i = 0, len = headers.length; i < len; i++) {
-                            panel.addControl(headers[i]);
-                        };
-
-                        buttonOn = 0;
-                        return;
-
+                        // Button turns on
+                        buttonOn = addMoreControls();
                     } else {
+                        // Button turns off
+                        console.log("button off")
 
                         $('#upload').remove();
 
-                        for (var i = 0, len = headers.length; i < len; i++) {
-                            panel.removeControl(headers[i]);
+                        // Remove alpha slider and color wheel
+                        removeSliderPicker();
+
+                        // Remove checkboxes and their headers. "scene.textures[0]._rootContainer._children[0]._children[0]" is the "Choose Colors" button
+                        // Needs to go backwards becuase the array of children shifts up when one is removed
+                        console.log(scene.textures[0]._rootContainer._children[0]._children)
+                        for (var len = scene.textures[0]._rootContainer._children[0]._children.length, i = len - 1; i > 0; i--) {
+                            scene.textures[0]._rootContainer._children[0]._children[i].dispose();
                         };
 
-                        removeSliderPicker();
                         buttonOn=1;
+                        console.log("button off end")
+                        //panel.dispose()
                     };
                 });
+                console.log("end of makeGUI")
+                //console.log(scene.mesh)
+                //if (typeof scene.meshes[5] != "undefined") {
+                //    scene.getMaterialByName(guiList[5]).diffuseColor = new BABYLON.Color3(0.89, 0.13, 0.13)
+                //};
+                console.log("List of meshes 485")
+                for (i=0; i < scene.meshes.length; i++) {
+                    console.log(scene.meshes[i])
+                }
+
             }; // End of makeGUI
-            <!-- #endregion -->
 
             // With async, this function waits for any line prefixed "await" to be done before moving on.
             // Without "await," any changes to the mesh while it is still loading will not take effect
-            async function makeEverything(meshList, urlList) {
-                for (var i = 0, len = meshList.length; i < len; i++) {
-                    new BABYLON.StandardMaterial(meshList[i], scene);
-                    await getMeshFromArray(meshList[i], urlList[i]);
-                };
 
-                //** Optional: Use the following lines to set the starting color
+            getMeshFromArray(meshList, urlList);
+            //appendWithMeshes(meshList, urlList); // runs out of memory
 
-				//scene.getMaterialByName(meshList[0]).diffuseColor = new BABYLON.Color3(0.89, 0.13, 0.13); // Mesh color
-                //scene.getMaterialByName(meshList[0]).specularColor = new BABYLON.Color3(0.97, 0.67, 0.7); //Reflected color
-				//scene.getMaterialByName(meshList[0]).alpha = 0.8; // Transparency
-
-                makeGUI();
-            };
-
-
-            makeEverything(meshList, urlList);
+            //** Optional: Use the following lines to set the starting color
+            <!-- #region fold -->
+			scene.getMaterialByName(meshList[0]).diffuseColor = new BABYLON.Color3(0.89, 0.13, 0.13); // Mesh color
+            scene.getMaterialByName(meshList[0]).specularColor = new BABYLON.Color3(0.97, 0.67, 0.7); //Reflected color
+			scene.getMaterialByName(meshList[0]).alpha = 0.8; // Transparency
+            <!-- #endregion -->
 
             // Functions to run using "Choose Files" button
+            <!-- #region fold -->
+
             function loadFiles(files, callback) {
                 var listNamesSTLs = [];
                 var listSTLURL = [];
@@ -410,6 +566,10 @@
                                 var url = URL.createObjectURL(blob);
 
                                 listSTLURL.push(url)
+
+                                if (listSTLURL.length == files.length) {
+                                    callback(listSTLURL, listNamesSTLs); // completedResult
+                                };
                             };
                         })(f);
                         //console.log("reader")
@@ -515,8 +675,8 @@
                                             //var blob = new Blob([data], {type: 'application/octet-stream'}); //"data" will be the STL content, and the content type "application/octet-stream" is a binary file
                                             var blob = new Blob([data]); //"type" is not necessary
                                             var objectURL = URL.createObjectURL(blob); //creates URL that is the download link
-                                            console.log("objectURL")
-                                            console.log(objectURL)
+                                            //console.log("objectURL")
+                                            //console.log(objectURL)
                                             return objectURL
                                         }
 
@@ -587,34 +747,27 @@
                         //and the loadend (reader.onload) is triggered. At that time, the result attribute contains an ArrayBuffer representing the file's data.
                         reader.readAsArrayBuffer(f);
                     }
-                } // end of for loop
-            } // end of loadFiles function
+                }; // end of for loop
+                //console.log("listSTLURL")
+                //console.log(listSTLURL)
+                //console.log(listNamesSTLs)
+                //callback(listSTLURL, listNamesSTLs);
+            }; // end of loadFiles function
 
             // handleFileSelect is called by the "Choose Files" button
             function handleFileSelect(evt) {
                 function completedResult(listSTLURL, listNamesSTLs) {
-                    console.log("in function completeResult")
-                    console.log(listSTLURL)
-                    console.log(listNamesSTLs)
+                    appendWithMeshes(listNamesSTLs, listSTLURL);
+                };
 
-                    //getMeshFromArray(listNamesSTLs[0], listSTLURL[0]) not allowed to load local resource
-                    for (i = 0, len = listSTLURL.length; i < len; i++) {
-                        console.log(i)
-
-                        BABYLON.SceneLoader.Append("", listSTLURL[i], scene, function () {
-                            scene.createDefaultCamera(true, true, true);
-                        }, undefined, undefined, ".stl");
-                    }
-                    //makeEverything(listNamesSTLs, listSTLURL)
-                }
                 var files = evt.target.files; // FileList object
 
                 loadFiles(files, completedResult);
             }
+            <!-- #endregion -->
 
             return scene;
         }; // End of createScene
-
 
 <!-- #region fold -->
 
