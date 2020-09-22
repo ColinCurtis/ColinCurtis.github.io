@@ -112,12 +112,37 @@
             // Mesh importing
             <!-- #region fold -->
 
-            // Make usable links and names of imported meshes
+            // Makes website links usable and formats names of imported meshes
             function cleanFileNames(fileNameList) {
                 // Namify cleans up names for labeling. Expects STL filename structure to be <number>_<name>.<extension (length agnostic I think)>
-                function namify(rawNames) {
-                    rawNames = /_(.+)/.exec(rawNames)[1]; // Remove numbers and _ in first part of filename
-                    rawNames = rawNames.replace(/\.[^/.]+$/, ""); // Remove extension
+                function namify(rawNames) { // causes error if names do not conform
+                    var isCharDigit = (function(){ // https://stackoverflow.com/a/32572539/7454736
+                      var a = [1,1,1,1,1,1,1,1,1,1];
+                      return function(n){
+                        return !!a[n] // check if `a` Array has anything in index 'n'. Cast result to boolean
+                      }
+                    })();
+                    let underscoreLoc = rawNames.indexOf("_");
+                    let char;
+                    let allDigits = true;
+
+                    // Remove de-ID from filename is it is all numbers and decimals preceding an underscore at beginning of name
+                    if (underscoreLoc !== -1) {                            // If filename has an underscore,
+                        for ( char of rawNames.slice(0, underscoreLoc) ) { // loop through characters before underscore
+                            if (!isCharDigit(char) && char !== "." && char !== " ") {      // to make sure they are all digits, decimals, and spaces before removing them
+                                allDigits = false;
+                                break
+                            };
+                        };
+                        if (allDigits) {
+                            rawNames = /_(.+)/.exec(rawNames)[1]; // Remove numbers and _ in first part of filename
+                        }
+                    };
+
+                    // Remove extension. Expects extention to be a decimal followed by at most four characters at end of name
+                    if (rawNames.includes(".", rawNames.length - 5)) {
+                        rawNames = rawNames.replace(/\.[^/\\.]+$/, ""); //https://stackoverflow.com/questions/4250364/how-to-trim-a-file-extension-from-a-string-in-javascript
+                    };
                     return rawNames;
                 };
 
@@ -194,16 +219,14 @@
             };
 
             // Function used when dragging and dropping
-            function appendWithMeshes(listNamesSTLs, listSTLURL) {
-                console.log("appendWithMeshes")
-                //console.log("listNamesSTLs: " + listNamesSTLs)
-                //console.log("listSTLURL: " + listSTLURL)
-
+            async function appendWithMeshes(listNamesSTLs, listSTLURL) {
                 async function actualImport(listNamesSTLs, listSTLURL, meshNumber, i) {
+                    let failures = [];
                     await BABYLON.SceneLoader.Append("", listSTLURL[i], scene,
                         function () {
+                            console.log("Successfully loaded " + listNamesSTLs[i] + "!");
 
-                            let mesh = scene.meshes[meshNumber + i];
+                            let mesh = scene.meshes[scene.meshes.length - 1]; // Most recently added mesh
 
                             mesh.name = listNamesSTLs[i];
                             mesh.material = scene.getMaterialByName(listNamesSTLs[i]);
@@ -222,46 +245,52 @@
                             scene.activeCamera.panningSensibility = 150;
                             <!-- #endregion-->
 
-                            if (i === listSTLURL.length - 1) {
+                            // Show progress in console
+                            console.log("loaded " + [scene.meshes.length, meshNumber * -1].reduce((a, b) => a + b, 0) + "/" + [listSTLURL.length, meshNumber, meshNumber * -1].reduce((a, b) => a + b, 0));
+                            console.log('\n');
+
+                            if (scene.meshes.length === listSTLURL.length + meshNumber) { // Only makes GUI once all meshes are loaded
+
                                 for (let j = 0; j < listSTLURL.length; j++) {
-                                    urlList.push(listSTLURL[j]);
+                                    urlList.push(listSTLURL[j]); // Adds new mesh URLs to global list
                                 };
-                                /*window.setTimeout(function () {
-                                    makeGUI();
-                                }, 10000);*/
-                                makeGUI();
+
+                                console.log("going to makeGUI now");
+                                scene.executeWhenReady(makeGUI());
                             }
-                            // Code here loads after GUI is made if i is final
-
                         },
 
-                        function() {
+                        function() { // Runs when mesh is loading
                             //console.log(i)
-                            console.log("Loading " + listNamesSTLs[i] + "(" + i + ")");
+                            //console.log("Loading " + listNamesSTLs[i] + "(" + i + ")");
+                            //console.log("number of meshes: " + scene.meshes.length);
                         },
-                        function(error) {
-                            console.error("### Error loading model")
+                        function(error) { // Runs when mesh can't load or success or loading functions fail
+                            console.error("Error loading model " + listNamesSTLs[i])
                             console.error(error)
+                            failures.push(i); // Maybe add a way to ignore these so the rest are loaded, then alert meshes that couldn't load
                         }, ".stl");
                     // Code here runs before code in BABYLON.SceneLoader.Append
+                    /*window.setTimeout(function () {
+                        console.log("fr going to makeGUI")
+                        makeGUI()
+                    }, 10000);*/
+
                 };
 
                 let meshNumber = scene.meshes.length;
                 for (i = 0, len = listSTLURL.length; i < len; i++) {
+                    //console.log("listSTLURL " + i + ": " + listSTLURL[i]);
                     new BABYLON.StandardMaterial(listNamesSTLs[i], scene);
-                    actualImport(listNamesSTLs, listSTLURL, meshNumber, i);
-                    console.log("attempt " + i)
+                    await actualImport(listNamesSTLs, listSTLURL, meshNumber, i);
+                    //console.log("attempt " + i)
                 };
             };
 
             // Enter links to meshes here
-            let urlList = ["https://www.dropbox.com/s/a3kplcg15ratxmz/249_Arteries.stl?dl=0", "https://www.dropbox.com/s/9y64gkfou5iq3vj/249_Skull%20Bottom.stl?dl=0"];
-            // large stl:  "https://www.dropbox.com/s/rwwo7imdroc4fmm/0_Skull%20and%20spine%201.stl?dl=0"
-            //let urlList = ["https://www.dropbox.com/s/rwwo7imdroc4fmm/0_Skull%20and%20spine%201.stl?dl=0"];
-            //var urlList = ["https://dl.dropbox.com/s/vsx2rjsohz0n0ne/236_Arteries.stl", "https://dl.dropbox.com/s/k8c148mspznpaot/236_Skull%20bottom.stl", "https://dl.dropbox.com/s/watabn3g4kzqu3h/236_Skull%20top.stl"];
+            let urlList = [];
 
             // Enter filenames here for non-dropbox links
-            //let meshList = ["249_Arteries.stl", "249_Skull Bottom.stl"];
             let meshList = [];
 
             <!-- #endregion -->
@@ -272,15 +301,15 @@
                 let guiList = [];
                 let addedMesh = false;
                 scene.meshes.forEach(mesh => guiList.push(mesh.name));
-                console.log("urlList:")
-                for (let n = 0; n < urlList.length; n++) {
-                    console.log(urlList[n])
+                console.log("guiList:")
+                for (let n = 0; n < guiList.length; n++) {
+                    console.log(guiList[n])
                 }
 
-                console.log("List of meshes 270")
+                /*console.log("List of meshes 270")
                 for (i=0; i < scene.meshes.length; i++) {
                     console.log(scene.meshes[i])
-                }
+                }*/
 
                 let cleanMeshNames = cleanFileNames(guiList);
 
@@ -482,7 +511,7 @@
 
                         // Remove checkboxes and their headers. "scene.textures[0]._rootContainer._children[0]._children[0]" is the "Choose Colors" button
                         // Needs to go backwards becuase the array of children shifts up when one is removed
-                        console.log(scene.textures[0]._rootContainer._children[0]._children)
+                        //console.log(scene.textures[0]._rootContainer._children[0]._children)
                         for (var len = scene.textures[0]._rootContainer._children[0]._children.length, i = len - 1; i > 0; i--) {
                             scene.textures[0]._rootContainer._children[0]._children[i].dispose();
                         };
@@ -497,10 +526,10 @@
                 //if (typeof scene.meshes[5] != "undefined") {
                 //    scene.getMaterialByName(guiList[5]).diffuseColor = new BABYLON.Color3(0.89, 0.13, 0.13)
                 //};
-                console.log("List of meshes 485")
+                /*console.log("List of meshes 485")
                 for (i=0; i < scene.meshes.length; i++) {
                     console.log(scene.meshes[i])
-                }
+                }*/
 
             }; // End of makeGUI
 
@@ -508,14 +537,9 @@
             // Without "await," any changes to the mesh while it is still loading will not take effect
 
             getMeshFromArray(meshList, urlList);
-            //appendWithMeshes(meshList, urlList); // runs out of memory
+            //appendWithMeshes(meshList, urlList); // blocked due to CORS policy???
+            //appendWithMeshes(fixURL(meshList, urlList)) // Not working
 
-            //** Optional: Use the following lines to set the starting color
-            <!-- #region fold -->
-			scene.getMaterialByName(meshList[0]).diffuseColor = new BABYLON.Color3(0.89, 0.13, 0.13); // Mesh color
-            scene.getMaterialByName(meshList[0]).specularColor = new BABYLON.Color3(0.97, 0.67, 0.7); //Reflected color
-			scene.getMaterialByName(meshList[0]).alpha = 0.8; // Transparency
-            <!-- #endregion -->
 
             // Functions to run using "Choose Files" button
             <!-- #region fold -->
@@ -552,19 +576,17 @@
                         // STL
                         <!-- #region fold -->
                     } else if (f.name.slice(f.name.length - 3) == "stl") {
-
                         // TO DO: differentiate between STL, OBJ, FBX etc.
-                        listNamesSTLs.push(f.name);
 
                         let reader = new FileReader();
                         reader.onload = (function(theFile) {
                             return function (e) {
-                                //e.target.result can be copy and pasted into a babylonJS file so nothing external needs to be loaded
-                                var base64_model_content = e.target.result; // STL file in base64
+                                var base64_model_content = e.target.result; // STL file in base64. Can be copy and pasted into a babylonJS file so nothing external needs to be loaded
                                 var raw_content = BABYLON.Tools.DecodeBase64(base64_model_content);
                                 var blob = new Blob([raw_content]);
                                 var url = URL.createObjectURL(blob);
 
+                                listNamesSTLs.push(theFile.name);
                                 listSTLURL.push(url)
 
                                 if (listSTLURL.length == files.length) {
@@ -757,6 +779,7 @@
             // handleFileSelect is called by the "Choose Files" button
             function handleFileSelect(evt) {
                 function completedResult(listSTLURL, listNamesSTLs) {
+                    // To Do: alphabetize this list without needing padded zeros
                     appendWithMeshes(listNamesSTLs, listSTLURL);
                 };
 
