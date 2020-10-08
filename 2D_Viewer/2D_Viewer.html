@@ -130,8 +130,7 @@
             <!-- #region fold -->
             // Makes website links usable and formats names of imported meshes
             function cleanFileNames(fileNameList) {
-                console.log("iin cleanfFileNames")
-                // Namify cleans up names for labeling. Expects STL filename structure to be <number>_<name>.<extension (at most 4 characters and without a decimal (ie no .tar.gz))>
+                // Namify cleans up names for labeling. Expects STL filename structure to be <number>_<name>.<extension (length agnostic I think)>
                 function namify(rawNames) { // causes error if names do not conform
                     var isCharDigit = (function(){ // https://stackoverflow.com/a/32572539/7454736
                       var a = [1,1,1,1,1,1,1,1,1,1];
@@ -141,10 +140,9 @@
                     })();
                     let underscoreLoc = rawNames.indexOf("_");
                     let char;
-                    let deidentifiedNumber;
                     let allDigits = true;
 
-                    // Remove de-ID from filename if it is all numbers and decimals preceding an underscore at beginning of name
+                    // Remove de-ID from filename is it is all numbers and decimals preceding an underscore at beginning of name
                     if (underscoreLoc !== -1) {                            // If filename has an underscore,
                         for ( char of rawNames.slice(0, underscoreLoc) ) { // loop through characters before underscore
                             if (!isCharDigit(char) && char !== "." && char !== " ") {      // to make sure they are all digits, decimals, and spaces before removing them
@@ -153,28 +151,24 @@
                             };
                         };
                         if (allDigits) {
-                            deidentifiedNumber = rawNames.split(/[_]/)[0];
                             rawNames = /_(.+)/.exec(rawNames)[1]; // Remove numbers and _ in first part of filename
-                        };
+                        }
                     };
 
                     // Remove extension. Expects extention to be a decimal followed by at most four characters at end of name
                     if (rawNames.includes(".", rawNames.length - 5)) {
                         rawNames = rawNames.replace(/\.[^/\\.]+$/, ""); //https://stackoverflow.com/questions/4250364/how-to-trim-a-file-extension-from-a-string-in-javascript
                     };
-                    return [rawNames, deidentifiedNumber];
+                    return rawNames;
                 };
 
                 // Rename the meshes for better labels
                 let cleanMeshNames = [];
-                let deIDArray = [];
 
                 for (i = 0, len = fileNameList.length; i < len; i++) {
-                    let nameAndDeID = namify(fileNameList[i]);
-                    cleanMeshNames.push(nameAndDeID[0]);
-                    deIDArray.push(nameAndDeID[1]);
+                    cleanMeshNames.push(namify(fileNameList[i]));
                 };
-                return [cleanMeshNames, deIDArray];
+                return cleanMeshNames;
             };
             <!-- #endregion -->
 
@@ -208,6 +202,46 @@
                 [fixedMeshNames, cleanURLs] = fixFileHostingURLs(meshNamesToFix, hyperlinks); // URLs needed to be adjusted BabylonJS to load
 
                 return [fixedMeshNames, cleanURLs];
+            };
+            <!-- #endregion -->
+
+            // getMeshFromArray()
+            <!-- #region fold-->
+            // Display meshes
+            async function getMeshFromArray(meshList, urlList) {
+                // With async, this function waits for any line prefixed "await" to be done before moving on.
+                // Without "await," any changes to the mesh while it is still loading will not take effect
+
+                let fixedMeshNames = [];
+                let cleanURLs = [];
+                let meshNumber = scene.meshes.length;
+
+                [fixedMeshNames, cleanURLs] = fixURL(meshList, urlList);
+
+                for (var i = 0, len = cleanURLs.length; i < len; i++) {
+                    new BABYLON.StandardMaterial(fixedMeshNames[i], scene);
+                    await BABYLON.SceneLoader.AppendAsync(cleanURLs[i], fixedMeshNames[i], scene).then(function () {
+                        // Everything in this function executes after mesh is loaded, but everything outside must be told to wait to make changes to mesh
+                        let mesh = scene.meshes[meshNumber + i];
+                        mesh.name = fixedMeshNames[i];
+                        mesh.material = scene.getMaterialByName(fixedMeshNames[i]);
+
+                        // scene properties
+                        <!-- #region fold-->
+                        mesh.material.backFaceCulling = false;
+                        mesh.material.needDepthPrePass = true;
+                        mesh.forceSharedVertices(); // Shade smooth
+
+                        // Create camera framed on loaded meshes
+                        scene.createDefaultCameraOrLight(true, true, true);
+                        scene.activeCamera.speed = 1;
+                        scene.activeCamera.multiTouchPanAndZoom = true;
+                        scene.activeCamera.inertia = 0.84;
+                        scene.activeCamera.panningSensibility = 150;
+                        <!-- #endregion-->
+                    });
+                };
+                makeGUI();
             };
             <!-- #endregion -->
 
@@ -259,13 +293,17 @@
                             //console.log("Loading " + listNamesSTLs[i] + "(" + i + ")");
                             //console.log("number of meshes: " + scene.meshes.length);
                         },
-
-                        function(error) { // Runs when mesh can't load. Also runs when success or loading functions fail
+                        function(error) { // Runs when mesh can't load or success or loading functions fail
                             console.error("Error loading model " + listNamesSTLs[i])
                             console.error(error)
                             failures.push(i); // Maybe add a way to ignore these so the rest are loaded, then alert meshes that couldn't load
                         }, ".stl");
                     // Code here runs before code in BABYLON.SceneLoader.Append
+                    /*window.setTimeout(function () {
+                        console.log("fr going to makeGUI")
+                        makeGUI()
+                    }, 10000);*/
+
                 };
 
                 let meshNumber = scene.meshes.length;
@@ -273,11 +311,6 @@
                 for (let j = 0, len = listSTLURL.length; j < len; j++) { // using i here instead of j will mess stuff up. Should use better variable name
                     //console.log("listSTLURL " + i + ": " + listSTLURL[i]);
                     new BABYLON.StandardMaterial(listNamesSTLs[j], scene);
-
-                    console.log("Right before actualImport. listNamesSTLs (meshList), listSTLURL (urlList)");
-                    console.log(listNamesSTLs)
-                    console.log(listSTLURL)
-
                     await actualImport(listNamesSTLs, listSTLURL, meshNumber, j);
                     console.log("attempt " + j)
                 };
@@ -333,11 +366,7 @@
                     console.log(guiList[n])
                 }
 
-                let cleanFileNamesResult = cleanFileNames(guiList);
-                let cleanMeshNames = cleanFileNamesResult[0];
-                let deIDs = cleanFileNamesResult[1];
-                console.log("deIDs")
-                console.log(deIDs);
+                let cleanMeshNames = cleanFileNames(guiList);
 
                 console.log(scene.textures[0])
 
@@ -526,11 +555,9 @@
                     panel.addControl(button2);
 
                     button2.onPointerUpObservable.add(function() {
-                        if (confirm("Download model as a GLB file?")) {
-                            BABYLON.GLTF2Export.GLBAsync(scene, "2D Viewer Export").then((glb) => {
-                                glb.downloadFiles();
-                            });
-                        };
+                        BABYLON.GLTF2Export.GLBAsync(scene, "2D Viewer Export").then((glb) => {
+                            glb.downloadFiles();
+                        });
                     });
                 };
 
@@ -549,15 +576,11 @@
 
                 var buttonOn = 1;
 
-                function addUploadButton() {
+                function addGUIControls() {
+                    // "Upload Files" button
                     $('#upload').remove(); // Not sure if this line is needed
                     $('body').append('<input id="upload" type="file" multiple style="position: absolute; top: 10px; left: 150px;"/>');
                     $('#upload').on('change', handleFileSelect); // I added "<script src="jquery.min.js"> < /script>" to HTML file otherwise this doesn't work
-                };
-
-                function addGUIControls() {
-
-                    addUploadButton();
 
                     if (scene.meshes.length > 0) {
                         addGLBExportButton();
@@ -586,13 +609,9 @@
                         //panel.dispose()
                     };
                 });
-
                 <!-- #endregion -->
 
-                if (scene.meshes.length == 0) { // If 2D Viewer loads with no meshes,
-                    addUploadButton();          // make upload button visible
-                    buttonOn = 0;               // and make sure the "change colors" button will remove it with the first click
-                };
+
 
 				// *Optional: Change colors of default binary data meshes
                 <!-- #region fold -->
@@ -607,8 +626,9 @@
             }; // End of makeGUI
             <!-- #endregion -->
 
-            let fixedMeshUrlList = fixURL(meshList, urlList);
-            appendWithMeshes(fixedMeshUrlList[0], fixedMeshUrlList[1]);
+            getMeshFromArray(meshList, urlList);
+            //appendWithMeshes(meshList, urlList); // blocked due to CORS policy???
+            //appendWithMeshes(fixURL(meshList, urlList)) // Not working
 
             //** Optional: Use the following lines to set the starting color of default meshes from hyperlinks
             <!-- #region fold -->
@@ -660,8 +680,8 @@
                         reader.onload = (function(theFile) {
                             return function (e) {
                                 var base64_model_content = e.target.result; // STL file in base64. Can be copy and pasted into a babylonJS file so nothing external needs to be loaded
-                                //console.log(theFile.name + " in base64");
-                                //console.log(base64_model_content);
+                                console.log(theFile.name + " in base64");
+                                console.log(base64_model_content);
                                 var raw_content = BABYLON.Tools.DecodeBase64(base64_model_content);
                                 var blob = new Blob([raw_content]);
                                 var url = URL.createObjectURL(blob);
@@ -670,7 +690,7 @@
                                 listSTLURL.push(url)
 
                                 if (listSTLURL.length == files.length) {
-                                    callback(listNamesSTLs, listSTLURL); // appendWithMeshes
+                                    callback(listSTLURL, listNamesSTLs); // completedResult
                                 };
                             };
                         })(f);
@@ -845,10 +865,8 @@
                                 listSTLURL.push(newURLandName[0]);
                                 listNamesSTLs.push(newURLandName[1]);
 
-                                // To Do: alphabetize this list without needing padded zeros
-
                                 if (listSTLURL.length == files.length) {
-                                    callback(listNamesSTLs, listSTLURL); // appendWithMeshes
+                                    callback(listSTLURL, listNamesSTLs); // completedResult
                                 };
                             };
                         })(f);
@@ -860,10 +878,17 @@
                 }; // end of for loop
             }; // end of loadFiles function
 
-            function handleFileSelect(evt) { // Called by the "Choose Files" button
+            // handleFileSelect is called by the "Choose Files" button
+            function handleFileSelect(evt) {
+                function completedResult(listSTLURL, listNamesSTLs) {
+                    // To Do: alphabetize this list without needing padded zeros
+                    appendWithMeshes(listNamesSTLs, listSTLURL);
+                };
+
                 var files = evt.target.files; // FileList object
-                loadFiles(files, appendWithMeshes);
-            };
+
+                loadFiles(files, completedResult);
+            }
             <!-- #endregion -->
 
             return scene;
