@@ -273,18 +273,22 @@ function dumpDataSet(dataSet, output)
                 let uTag = "";
                 let uTagEnd = "";
                 let colorTag = "";
-                if (element.tag === "x00080020" || element.tag === "x00080050" || element.tag === "x00080060" || element.tag === "x00100010" || element.tag === "x00100020" || element.tag === "x00180015" || element.tag === "x00181030" || element.tag === "x00200011" || element.tag === "x00081030" || element.tag === "x0008103e" || element.tag === "x00181048" || element.tag === "x00180010" || element.tag === "x00321060" || element.tag === "x00400254" || element.tag === "x00401001") {
+                if (element.tag === "x00080020" || element.tag === "x00080050" || element.tag === "x00080060" || element.tag === "x00100010" || element.tag === "x00100020" || element.tag === "x00180015" || element.tag === "x00181030" || element.tag === "x00200011" || element.tag === "x00081030" || element.tag === "x0008103e" || element.tag === "x00181048" || element.tag === "x00180010" || element.tag === "x00321060" || element.tag === "x00400254" || element.tag === "x00401001" || element.tag === "x00400009") {
                     boldTag = "<b>";
                     boldEndTag = "</b>";
                     if (element.tag === "x0008103e") {
                         uTag = "<u>";
                         uTagEnd = "</u>";
                     }
-                    if (element.tag === "x00181048" || element.tag === "x00180010") {
+                    if (element.tag === "x00181048" || element.tag === "x00180010") { // Contrast
                         boldTag = "";
                         colorTag = "<b style='color:DodgerBlue;'>";
                     }
-                    if (element.tag === "x0008103e" || element.tag === "x00200011") {
+                    if (element.tag === "x00080050" || element.tag === "x00200010" element.tag === "x00400009" || element.tag === "x00401001") { // Accession number
+                        boldTag = "";
+                        colorTag = "<b style='color:Green;'>";
+                    }
+                    if (element.tag === "x0008103e" || element.tag === "x00200011") { // Series name
                         boldTag = "";
                         colorTag = "<b style='color:IndianRed;'>";
                     }
