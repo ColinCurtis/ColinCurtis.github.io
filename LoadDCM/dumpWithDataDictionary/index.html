@@ -273,22 +273,22 @@ function dumpDataSet(dataSet, output)
                 let uTag = "";
                 let uTagEnd = "";
                 let colorTag = "";
-                if (element.tag === "x00080020" || element.tag === "x00080050" || element.tag === "x00080060" || element.tag === "x00100010" || element.tag === "x00100020" || element.tag === "x00180015" || element.tag === "x00181030" || element.tag === "x00200011" || element.tag === "x00081030" || element.tag === "x0008103e" || element.tag === "x00181048" || element.tag === "x00180010" || element.tag === "x00321060" || element.tag === "x00400254" || element.tag === "x00401001" || element.tag === "x00400009" || element.tag === "x00080012" || element.tag === "x00080021" || element.tag === "x00080022" || element.tag === "x00080023" || element.tag === "x00400244" || element.tag === "x00100030" || element.tag === "x00100040" || element.tag === "x00101010" || element.tag === "x00101080" || element.tag === "x001021b0" || element.tag === "x00321030" || element.tag === "x00080104") {
+                if (element.tag === "x00080020" || element.tag === "x00080050" || element.tag === "x00080060" || element.tag === "x00100010" || element.tag === "x00100020" || element.tag === "x00180015" || element.tag === "x00181030" || element.tag === "x00200011" || element.tag === "x00081030" || element.tag === "x0008103e" || element.tag === "x00181048" || element.tag === "x00180010" || element.tag === "x00321060" || element.tag === "x00400254" || element.tag === "x00401001" || element.tag === "x00400009" || element.tag === "x00080012" || element.tag === "x00080021" || element.tag === "x00080022" || element.tag === "x00080023" || element.tag === "x00400244" || element.tag === "x00100030" || element.tag === "x00100040" || element.tag === "x00101010" || element.tag === "x00101080" || element.tag === "x001021b0" || element.tag === "x00321030" || element.tag === "x00080104" || element.tag === "x00400002" || element.tag === "x00400004" || element.tag === "x00400007" || element.tag === "x0008002a" || element.tag === "x00101010") {
                     boldTag = "<b>";
                     boldEndTag = "</b>";
                     if (element.tag === "x0008103e") {
                         uTag = "<u>";
                         uTagEnd = "</u>";
                     }
-                    if (element.tag === "x00080012" || element.tag === "x00080020" || element.tag === "x00080021" || element.tag === "x00080022" || element.tag === "x00080023" || element.tag === "x00400244") { // Date
+                    if (element.tag === "x00080012" || element.tag === "x00080020" || element.tag === "x00080021" || element.tag === "x00080022" || element.tag === "x00080023" || element.tag === "x00400244" || element.tag === "x00400002" || element.tag === "x00400004" || element.tag === "x0008002a") { // Date
                         boldTag = "";
-                        colorTag = "<b style='color:PeachPuff;'>";
+                        colorTag = "<b style='color:Goldenrod;'>";
                     }
                     if (element.tag === "x00181048" || element.tag === "x00180010") { // Contrast
                         boldTag = "";
                         colorTag = "<b style='color:DodgerBlue;'>";
                     }
-                    if (element.tag === "x00100010" || element.tag === "x0010020" || element.tag === "x00100030" || element.tag === "x00100040" || element.tag === "x00101080" element.tag === "x001021b0") { // Patient Info
+                    if (element.tag === "x00100010" || element.tag === "x0010020" || element.tag === "x00100030" || element.tag === "x00100040" || element.tag === "x00101080" || element.tag === "x001021b0" || element.tag === "x00100020" || element.tag === "x00101010") { // Patient Info
                         boldTag = "";
                         colorTag = "<b style='color:DeepPink;'>";
                     }
