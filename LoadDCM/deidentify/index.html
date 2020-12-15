@@ -176,6 +176,7 @@
         $('span[data-dicom]').each(function(index, value)
         {
             var attr = $(value).attr('data-dicom');
+			console.log(`attr is ${attr})
             var element = dataSet.elements[attr];
             var text = "";
             if(element !== undefined)
