@@ -1,0 +1,265 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        table, th, td {
+          border: 1px solid black;
+          border-collapse: collapse;
+        }
+    </style>
+    <title>Automatic DICOM Encapsulated STL Colorizer</title>
+
+</head>
+<body>
+    <h1>Automatic DICOM Encapsulated STL Colorizer</h1>
+    <p>Choose DICOM encapsulated STLs, then either change each model's color to your liking or download with the automatically assigned colors. The colors are given based on file names.</p>
+    <p>The files you choose are not uploaded anywhere; all processing is done within your browser.</p>
+<input id="upload" type="file" multiple>
+<div class="container">
+
+    <div id="dropZone" class="container-fluid">
+
+        <br>
+
+        <div id="status" class="alert alert-success">
+            <div id="statusText">
+                Status: Ready (no file loaded)
+            </div>
+            <ul id="warnings">
+
+            </ul>
+        </div>
+
+        <table id="stlTable">
+            <thead>
+                <tr>
+                    <th>
+                        Name
+                    </th>
+                    <th>
+                        Original
+                    </th>
+                    <th>
+                        Re-colored <button id="download">Download</button>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<!-- <script src="https://unpkg.com/dicom-parser@1.8.7/dist/dicomParser.min.js"></script> -->
+<script src="https://rawgit.com/pieper/dcmjs/master/build/dcmjs.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.5.0/jszip.min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>
+
+
+</body>
+
+<script>
+
+    function addDicomValuesToTable(dicomTags)
+    {
+        let documentTitle = dicomTags["DocumentTitle"]
+        let nameText = "";
+        if(documentTitle !== undefined) {nameText = documentTitle};
+        console.log(`Loading model called ${nameText}`)
+
+        let contentDescription = dicomTags["ContentDescription"];
+        var colorText = "";
+        if (contentDescription !== undefined) {colorText = contentDescription};
+
+        let newColorTag;
+        if (colorText !== undefined) {
+            newColorTag = `ColorRGB(${getRGBColorFromName(nameText)})`
+        };
+
+        $("table").find('tbody').append(`<tr>
+                                            <td class="col-sm-4"><span stl-name="DocumentTitle">${nameText}</span></td>
+                                            <td class="col-sm-4"><span data-dicom="ContentDescription">${colorText}</span></td>
+                                            <td class="col-sm-4"><input id="deIdInput" data-vr="LO" class="col-sm-12" type="text" data-dicom="ContentDescription" value=${newColorTag}></td>
+                                        </tr>`);
+    }
+
+    function getRGBColorFromName(title) {
+
+        let customAnatomyRepeats=["Arter", "Arter", "Vein", "Vein", "Bone", "Bone"];
+
+        let customAnatomyMore=["Nerve", "Mass", "Tumor", "Hardware light", "Hardware", "Hardware dark", "Liver", "Liver Right", "Kidney", "Ureter", "Gallbladder", "Heart", "Lung", "Bronchi", "Brain", "Anal Verge", "Bladder", "Colon", "External Sphincter", "External Sphincter Inferior", "External Sphincter Middle", "External Sphincter Superior", "Internal Sphincter", "Levator Ani", "Mesorectal Fascia", "Peritoneal Reflection", "Prostate", "Puborectalis", "Rectum", "Seminal Vesicle", "Uterus", "Vagina", "Cervical", "Thoracic", "Lumbar", "Sacrum"];
+
+        let customAnatomy = customAnatomyRepeats.concat(customAnatomyMore);
+
+        let customRGBValues=["180,013,029", "224,068,073", "062,062,178", "023,136,180", "230,222,204", "213,194,159", "245,215,135", "144,238,144", "144,238,144", "156,157,156", "103,103,102", "062,060,060", "181,069,022", "196,055,019", "129,048,045", "229,202,122", "075,077,036", "104,031,031", "246,137,137", "206,107,078", "231,139,130", "218,192,181", "202,111,113", "192,119,097", "205,083,101", "146,013,017", "189,069,056", "205,116,099", "175,082,068", "134,031,034", "177,146,088", "247,091,000", "221,148,144", "239,121,090", "211,135,121", "246,200,197", "149,075,096", "187,133,140", "230,222,204", "213,194,159", "230,222,204", "230,222,204"];
+
+        let slicerAnatomy=["background", "tissue", "bone", "skin", "connective tissue", "blood", "organ", "mass", "muscle", "foreign object", "waste", "teeth", "fat", "gray matter", "white matter", "nerve", "vein", "artery", "capillary", "ligament", "tendon", "cartilage", "meniscus", "lymph node", "lymphatic vessel", "cerebro-spinal fluid", "bile", "urine", "feces", "gas", "fluid", "edema", "bleeding", "necrosis", "clot", "embolism", "head", "central nervous system", "brain", "gray matter of brain", "telencephalon", "cerebral cortex", "right frontal lobe", "left frontal lobe", "right temporal lobe", "left temporal lobe", "right parietal lobe", "left parietal lobe", "right occipital lobe", "left occipital lobe", "right insular lobe", "left insular lobe", "right limbic lobe", "left limbic lobe", "right striatum", "left striatum", "right caudate nucleus", "left caudate nucleus", "right putamen", "left putamen", "right pallidum", "left pallidum", "right amygdaloid complex", "left amygdaloid complex", "diencephalon", "thalamus", "right thalamus", "left thalamus", "pineal gland", "midbrain", "substantia nigra", "right substantia nigra", "left substantia nigra", "cerebral white matter", "right superior longitudinal fasciculus", "left superior longitudinal fasciculus", "right inferior longitudinal fasciculus", "left inferior longitudinal fasciculus", "right arcuate fasciculus", "left arcuate fasciculus", "right uncinate fasciculus", "left uncinate fasciculus", "right cingulum bundle", "left cingulum bundle", "projection fibers", "right corticospinal tract", "left corticospinal tract", "right optic radiation", "left optic radiation", "right medial lemniscus", "left medial lemniscus", "right superior cerebellar peduncle", "left superior cerebellar peduncle", "right middle cerebellar peduncle", "left middle cerebellar peduncle", "right inferior cerebellar peduncle", "left inferior cerebellar peduncle", "optic chiasm", "right optic tract", "left optic tract", "right fornix", "left fornix", "commissural fibers", "corpus callosum", "posterior commissure", "cerebellar white matter", "CSF space", "ventricles of brain", "right lateral ventricle", "left lateral ventricle", "right third ventricle", "left third ventricle", "cerebral aqueduct", "fourth ventricle", "subarachnoid space", "spinal cord", "gray matter of spinal cord", "white matter of spinal cord", "endocrine system of brain", "pituitary gland", "adenohypophysis", "neurohypophysis", "meninges", "dura mater", "arachnoid", "pia mater", "muscles of head", "salivary glands", "lips", "nose", "tongue", "soft palate", "right inner ear", "left inner ear", "right external ear", "left external ear", "right middle ear", "left middle ear", "right eyeball", "left eyeball", "skull", "right frontal bone", "left frontal bone", "right parietal bone", "left parietal bone", "right temporal bone", "left temporal bone", "right sphenoid bone", "left sphenoid bone", "right ethmoid bone", "left ethmoid bone", "occipital bone", "maxilla", "right zygomatic bone", "right lacrimal bone", "vomer bone", "right palatine bone", "left palatine bone", "mandible", "neck", "muscles of neck", "pharynx", "larynx", "thyroid gland", "right parathyroid glands", "left parathyroid glands", "skeleton of neck", "hyoid bone", "cervical vertebral column", "thorax", "trachea", "bronchi", "right lung", "left lung", "superior lobe of right lung", "superior lobe of left lung", "middle lobe of right lung", "inferior lobe of right lung", "inferior lobe of left lung", "pleura", "heart", "right atrium", "left atrium", "atrial septum", "ventricular septum", "right ventricle of heart", "left ventricle of heart", "mitral valve", "tricuspid valve", "aortic valve", "pulmonary valve", "aorta", "pericardium", "pericardial cavity", "esophagus", "thymus", "mediastinum", "skin of thoracic wall", "muscles of thoracic wall", "skeleton of thorax", "thoracic vertebral column", "ribs", "sternum", "right clavicle", "left clavicle", "abdominal cavity", "abdomen", "peritoneum", "omentum", "peritoneal cavity", "retroperitoneal space", "stomach", "duodenum", "small bowel", "colon", "anus", "liver", "biliary tree", "gallbladder", "pancreas", "spleen", "urinary system", "right kidney", "left kidney", "right ureter", "left ureter", "urinary bladder", "urethra", "right adrenal gland", "left adrenal gland", "female internal genitalia", "uterus", "right fallopian tube", "left fallopian tube", "right ovary", "left ovary", "vagina", "male internal genitalia", "prostate", "right seminal vesicle", "left seminal vesicle", "right deferent duct", "left deferent duct", "skin of abdominal wall", "muscles of abdominal wall", "skeleton of abdomen", "lumbar vertebral column", "female external genitalia", "male external genitalia", "skeleton of upper limb", "muscles of upper limb", "right upper limb", "left upper limb", "right shoulder", "left shoulder", "right arm", "left arm", "right elbow", "left elbow", "right forearm", "left forearm", "right wrist", "left wrist", "right hand", "left hand", "skeleton of lower limb", "muscles of lower limb", "right lower limb", "left lower limb", "right hip", "left hip", "right thigh", "left thigh", "right knee", "left knee", "right leg", "left leg", "right foot", "left foot", "peripheral nervous system", "autonomic nerve", "sympathetic trunk", "cranial nerves", "vagus nerve", "peripheral nerve", "circulatory system", "systemic arterial system", "systemic venous system", "pulmonary arterial system", "pulmonary venous system", "lymphatic system", "needle", "region 0", "region 1", "region 2", "region 3", "region 4", "region 5", "region 6", "region 7", "region 8", "region 9", "region 10", "region 11", "region 12", "region 13", "region 14", "region 15", "unknown", "cyst"];
+
+        let slicerRGBValues = ["000,000,000", "128,174,128", "241,214,145", "177,122,101", "111,184,210", "216,101,079", "221,130,101", "144,238,144", "192,104,088", "220,245,020", "078,063,000", "255,250,220", "230,220,070", "200,200,235", "250,250,210", "244,214,049", "000,151,206", "216,101,079", "183,156,220", "183,214,211", "152,189,207", "111,184,210", "178,212,242", "068,172,100", "111,197,131", "085,188,255", "000,145,030", "214,230,130", "078,063,000", "218,255,255", "170,250,250", "140,224,228", "188,065,028", "216,191,216", "145,060,066", "150,098,083", "177,122,101", "244,214,049", "250,250,225", "200,200,215", "068,131,098", "128,174,128", "083,146,164", "083,146,164", "162,115,105", "162,115,105", "141,093,137", "141,093,137", "182,166,110", "182,166,110", "188,135,166", "188,135,166", "154,150,201", "154,150,201", "177,140,190", "177,140,190", "030,111,085", "030,111,085", "210,157,166", "210,157,166", "048,129,126", "048,129,126", "098,153,112", "098,153,112", "069,110,053", "166,113,137", "122,101,038", "122,101,038", "253,135,192", "145,092,109", "046,101,131", "000,108,112", "000,108,112", "250,250,225", "127,150,088", "127,150,088", "159,116,163", "159,116,163", "125,102,154", "125,102,154", "106,174,155", "106,174,155", "154,146,083", "154,146,083", "126,126,055", "201,160,133", "201,160,133", "078,152,141", "078,152,141", "174,140,103", "174,140,103", "139,126,177", "139,126,177", "148,120,072", "148,120,072", "186,135,135", "186,135,135", "099,106,024", "156,171,108", "156,171,108", "064,123,147", "064,123,147", "138,095,074", "097,113,158", "126,161,197", "194,195,164", "085,188,255", "088,106,215", "088,106,215", "088,106,215", "088,106,215", "088,106,215", "088,106,215", "088,106,215", "088,106,215", "244,214,049", "200,200,215", "250,250,225", "082,174,128", "057,157,110", "060,143,083", "092,162,109", "255,244,209", "255,244,209", "255,244,209", "255,244,209", "201,121,077", "070,163,117", "188,091,095", "177,122,101", "166,084,094", "182,105,107", "229,147,118", "229,147,118", "174,122,090", "174,122,090", "201,112,073", "201,112,073", "194,142,000", "194,142,000", "241,213,144", "203,179,077", "203,179,077", "229,204,109", "229,204,109", "255,243,152", "255,243,152", "209,185,085", "209,185,085", "248,223,131", "248,223,131", "255,230,138", "196,172,068", "255,255,167", "255,250,160", "255,237,145", "242,217,123", "242,217,123", "222,198,101", "177,122,101", "213,124,109", "184,105,108", "150,208,243", "062,162,114", "062,162,114", "062,162,114", "242,206,142", "250,210,139", "255,255,207", "177,122,101", "182,228,255", "175,216,244", "197,165,145", "197,165,145", "172,138,115", "172,138,115", "202,164,140", "224,186,162", "224,186,162", "255,245,217", "206,110,084", "210,115,089", "203,108,081", "233,138,112", "195,100,073", "181,085,057", "152,055,013", "159,063,027", "166,070,038", "218,123,097", "225,130,104", "224,097,076", "255,244,209", "184,122,154", "211,171,143", "047,150,103", "255,244,209", "173,121,088", "188,095,076", "255,239,172", "226,202,134", "253,232,158", "244,217,154", "205,179,108", "205,179,108", "186,124,161", "177,122,101", "255,255,220", "234,234,194", "204,142,178", "180,119,153", "216,132,105", "255,253,229", "205,167,142", "204,168,143", "255,224,199", "221,130,101", "000,145,030", "139,150,098", "249,180,111", "157,108,162", "203,136,116", "185,102,083", "185,102,083", "247,182,164", "247,182,164", "222,154,132", "124,186,223", "249,186,150", "249,186,150", "244,170,147", "255,181,158", "255,190,165", "227,153,130", "213,141,113", "213,141,113", "193,123,103", "216,146,127", "230,158,140", "245,172,147", "245,172,147", "241,172,151", "241,172,151", "177,124,092", "171,085,068", "217,198,131", "212,188,102", "185,135,134", "185,135,134", "198,175,125", "194,098,079", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "255,238,170", "206,111,093", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "177,122,101", "216,186,000", "255,226,077", "255,243,106", "255,234,092", "240,210,035", "224,194,000", "213,099,079", "217,102,081", "000,147,202", "000,122,171", "186,077,064", "111,197,131", "240,255,030", "185,232,061", "000,226,255", "251,159,255", "230,169,029", "000,194,113", "104,160,249", "221,108,158", "137,142,000", "230,070,000", "000,147,000", "000,147,248", "231,000,206", "129,078,000", "000,116,000", "000,000,255", "157,000,000", "100,100,130", "205,205,100"];
+
+        //let title;
+        //let newColor = "080,080,080";
+        //$('span[stl-name]').each(function(index, value) { title = $(value).text() });
+        console.log(`title is ${title}`)
+        //console.log(customAnatomy)
+        //console.log(customRGBValues)
+
+        for (let i = 0; i < customAnatomy.length; i++) {
+            if (title.includes(customAnatomy[i])) {
+                console.log(`${title} includes ${customAnatomy[i]}`)
+                newColor = customRGBValues[i];
+            }
+        }
+        return newColor;
+    }
+
+    let dataSet = [];
+    let dicomDict;
+    let totalFilesize = 0;
+
+    function dumpFile(file)
+    {
+        $('#status').removeClass('alert-warning alert-success alert-danger').addClass('alert-info');
+        $('#warnings').empty();
+        document.getElementById('statusText').innerHTML = 'Status: Loading files, please wait..';
+
+        let reader = new FileReader();
+        reader.onload = function (file) {
+            function getFilesize(arrayBuffer) {
+                // dicomParser requires as input a Uint8Array instead of arrayBuffer
+                let byteArray = new Uint8Array(arrayBuffer);
+                let kb = byteArray.length / 1024;
+                let mb = kb / 1024;
+                //let byteStr = mb > 1 ? mb.toFixed(3) + " MB" : kb.toFixed(0) + " KB";
+                return mb
+            }
+
+            let arrayBuffer = reader.result;
+            let filesize = getFilesize(arrayBuffer);
+            totalFilesize += filesize;
+
+            dicomDict = dcmjs.data.DicomMessage.readFile(arrayBuffer);
+            //const datasetTest = dcmjs.data.DicomMetaDictionary.naturalizeDataset(dicomDict.dict);
+            //console.log(datasetTest.ContentDescription)
+
+            document.getElementById('statusText').innerHTML = '<span class="glyphicon glyphicon-cog"></span>Status: Parsing ' + filesize + ' megabytes.';
+
+            try {
+                dataSet.push(dcmjs.data.DicomMetaDictionary.naturalizeDataset(dicomDict.dict));
+                addDicomValuesToTable(dataSet.slice(-1)[0]);
+            }
+            catch(err)
+            {
+                $('#status').removeClass('alert-success alert-info alert-warning').addClass('alert-danger');
+                document.getElementById('statusText').innerHTML = 'Status: Error - ' + err + ' (file of size ' + filesize + ' megabytes)';
+            }
+        };
+
+        reader.readAsArrayBuffer(file); // executes reader.onload function once loaded
+    }
+
+    function handleFileSelect(evt) {
+        evt.stopPropagation();
+        evt.preventDefault();
+
+        var files = evt.target.files;
+
+        for (i = 0; i < files.length; i++) {
+            dumpFile(files[i]);
+        }
+    }
+
+    $('#upload').on('change', handleFileSelect);
+
+    $('#download').click(function () {
+        document.getElementById('statusText').innerHTML += `<br>Zipping ${totalFilesize} megabytes of data...`
+
+        let new_file_WriterBuffer;
+        console.log(dataSet);
+        // iterate through each input field and replace the original value with the de-identified value.
+        // Note that the deidentified value must be <= length of the original value - longer values
+        // will require resizing the Uint8Array and updating the length of the element and I don't feel
+        // like doing that right now :)
+
+
+        let dataTable = $(`#stlTable`);
+        let zip = new JSZip();
+
+        for (let i = 0, row; row = dataTable[0].rows[i + 1]; i++) {
+            function downloadData(data, fileName) {
+                var blob = new Blob([data], { type: 'application/dicom' }); //"data" will be the STL DCM content, and the content type "application/octet-stream" is a binary file
+                var objectURL = URL.createObjectURL(blob); //creates URL that is the download link
+                var a = document.createElement("a");
+                document.body.appendChild(a);
+                a.style = "display: none";
+                a.href = objectURL;
+                a.download = fileName;
+                a.click();
+                window.URL.revokeObjectURL(objectURL);
+                $(a).remove();
+            };
+
+            let filename = `${row.cells[0].firstChild.innerHTML}.dcm`;
+            dataSet[i].ContentDescription = row.cells[2].firstChild.value;
+
+            dicomDict.dict = dcmjs.data.DicomMetaDictionary.denaturalizeDataset(dataSet[i]);
+            console.log(dicomDict.dict)
+            new_file_WriterBuffer = dicomDict.write();
+            console.log(new_file_WriterBuffer)
+
+            //downloadData(new_file_WriterBuffer, filename)
+            zip.file(filename, new_file_WriterBuffer)
+        }
+
+        function getDeID(nameWithDeID) {
+            var isCharDigit = (function () { // https://stackoverflow.com/a/32572539/7454736
+                let a = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+                return function (n) {
+                    return !!a[n] // check if `a` Array has anything in index 'n'. Cast result to boolean
+                }
+            })();
+            let underscoreLoc = nameWithDeID.indexOf("_");
+            let char;
+            let deidentifiedNumber;
+            let nameSansDeID;
+            let allCharsDigits = true;
+
+            // Remove de-ID from filename if it is all numbers and decimals preceding an underscore at beginning of name
+            if (underscoreLoc !== -1) {                            // If filename has an underscore,
+                for (char of nameWithDeID.slice(0, underscoreLoc)) { // loop through characters before underscore
+                    if (!isCharDigit(char) && char !== "." && char !== " ") {      // to make sure they are all digits, decimals, and spaces before removing them
+                        allCharsDigits = false;
+                        break
+                    }
+                }
+                if (allCharsDigits) {
+                    deidentifiedNumber = nameWithDeID.split(/[_]/)[0];
+                    //nameSansDeID = /_(.+)/.exec(nameWithDeID)[1];
+                }
+            }
+            return deidentifiedNumber;
+        }
+
+        let deID = getDeID(dataTable[0].rows[1].cells[0].firstChild.innerHTML)
+        zip.generateAsync({ type: "blob" }).then(function (content) {
+        //    saveAs(content, "example.zip");
+ 
+            downloadData(content, `${deID}_ColoredEncapsulatedSTLs.zip`);
+            document.getElementById('statusText').innerHTML += `<br>Done.`
+        });
+
+        // download the de-identified DICOM P10 bytestream
+
+
+        //var blob = new Blob([new_file_WriterBuffer], {type: "application/dicom"});
+        //var url = window.URL.createObjectURL(blob);
+        //window.open(url);
+        //window.URL.revokeObjectURL(url);
+        
+    });
+
+</script>
+</html>
