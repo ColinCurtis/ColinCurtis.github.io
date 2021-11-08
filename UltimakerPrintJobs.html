@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-csv/1.0.21/jquery.csv.min.js" integrity="sha512-Y8iWYJDo6HiTo5xtml1g4QqHtl/PO1w+dmUpQfQSOTqKNsMhExfyPN2ncNAe9JuJUSKzwK/b6oaNPop4MXzkwg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+</head>
+<body>
+    <h2>Ultimaker Print Jobs</h2>
+    <p>Upload the print job CSV file from <a href="https://digitalfactory.ultimaker.com/app/printers">Ultimaker Digital Factory</a>.</p>
+    <input type="file" id="fileinput" />
+    <div class="tableDiv" id="tableDiv">
+    </div>
+    <script>
+        function CSVToArray(strData, strDelimiter) {
+            // ref: http://stackoverflow.com/a/1293163/2343
+            // This will parse a delimited string into an array of
+            // arrays. The default delimiter is the comma, but this
+            // can be overriden in the second argument.
+
+            // Check to see if the delimiter is defined. If not,
+            // then default to comma.
+            strDelimiter = (strDelimiter || ",");
+
+            // Create a regular expression to parse the CSV values.
+            var objPattern = new RegExp(
+                (
+                    // Delimiters.
+                    "(\\" + strDelimiter + "|\\r?\\n|\\r|^)" +
+
+                    // Quoted fields.
+                    "(?:\"([^\"]*(?:\"\"[^\"]*)*)\"|" +
+
+                    // Standard fields.
+                    "([^\"\\" + strDelimiter + "\\r\\n]*))"
+                ),
+                "gi"
+            );
+
+
+            // Create an array to hold our data. Give the array
+            // a default empty first row.
+            var arrData = [[]];
+
+            // Create an array to hold our individual pattern
+            // matching groups.
+            var arrMatches = null;
+
+
+            // Keep looping over the regular expression matches
+            // until we can no longer find a match.
+            while (arrMatches = objPattern.exec(strData)) {
+
+                // Get the delimiter that was found.
+                var strMatchedDelimiter = arrMatches[1];
+
+                // Check to see if the given delimiter has a length
+                // (is not the start of string) and if it matches
+                // field delimiter. If id does not, then we know
+                // that this delimiter is a row delimiter.
+                if (
+                    strMatchedDelimiter.length &&
+                    strMatchedDelimiter !== strDelimiter
+                ) {
+
+                    // Since we have reached a new row of data,
+                    // add an empty row to our data array.
+                    arrData.push([]);
+
+                }
+
+                var strMatchedValue;
+
+                // Now that we have our delimiter out of the way,
+                // let's check to see which kind of value we
+                // captured (quoted or unquoted).
+                if (arrMatches[2]) {
+
+                    // We found a quoted value. When we capture
+                    // this value, unescape any double quotes.
+                    strMatchedValue = arrMatches[2].replace(
+                        new RegExp("\"\"", "g"),
+                        "\""
+                    );
+
+                } else {
+
+                    // We found a non-quoted value.
+                    strMatchedValue = arrMatches[3];
+
+                }
+
+
+                // Now that we have our value string, let's add
+                // it to the data array.
+                arrData[arrData.length - 1].push(strMatchedValue);
+            }
+
+            // Return the parsed data.
+            return (arrData);
+        }
+
+        function makeTable(tsvArray) {
+            $(document).ready(function () {
+                var html = "<table border='1|1'>";
+                for (let row of tsvArray) {
+                    html += "<tr>";
+                    for (let col of row) {
+                        if (col === 'queued') {
+                            html += "<td style='background-color:#75BCFF'>"
+                        } else if (col === 'aborted') {
+                            html += "<td style='background-color:#FFA079'>"
+                        } else if (col === 'failed') {
+                            html += "<td style='background-color:#F24040'>";
+                        } else if (col === 'finished') {
+                            html += "<td style='background-color:#85C287'>"
+                        } else {
+                            html += "<td>";
+                        }
+
+                        html += col + "</td>";
+                    }
+                    html += "</tr>";
+                }
+                html += "</table>";
+                document.write(html);
+            });
+        }
+
+        function removeIrrelevantContent(contentsArray) {
+            /* <column # starting at 1>: <name>
+            1: id
+            2: compatible_machine_families
+            3: created_at
+            4: deleted_at
+            5: estimated_time_total
+            6: force
+            7: job_buildplate
+            8: job_material_1
+            9: job_material_1_guid
+            10: job_material_2
+            11: job_material_2_guid
+            12: job_material_amount_1_mm3
+            13: job_material_amount_2_mm3
+            14: job_material_grams_1
+            15: job_material_grams_2
+            16: job_printcore_1
+            17: job_printcore_2
+            18: machine_variant
+            19: name
+            20: owner
+            21: print_end_time
+            22: print_start_time
+            23: printer_buildplate
+            24: printer_material_1
+            25: printer_material_1_guid
+            26: printer_material_2
+            27: printer_material_2_guid
+            28: printer_material_grams_1
+            29: printer_material_grams_2
+            30: printer_printcore_1
+            31: printer_printcore_2
+            32: printer_uuid
+            33: require_printer_name
+            34: status
+            35: time_total_sec
+            36: uuid
+            */
+            let relevantLocations = [3, 4, 5, 8, 10, 12, 13, 14, 15, 19, 21, 22, 34, 35];
+            relevantLocations = relevantLocations.map(element => element - 1);
+
+            let relevantContentArray = [];
+            for (let row of contentsArray) {
+                let relevantData = relevantLocations.map(element => row[element]);
+                relevantContentArray.push(relevantData);
+            }
+            return relevantContentArray;
+        }
+
+        function orderContent(content) {
+            // https://stackoverflow.com/a/34841026/7454736
+            var toHHMMSS = (secs) => {
+                var sec_num = parseInt(secs, 10)
+                var hours = Math.floor(sec_num / 3600)
+                var minutes = Math.floor(sec_num / 60) % 60
+                var seconds = sec_num % 60
+
+                return [hours, minutes, seconds]
+                    .map(v => v < 10 ? "0" + v : v)
+                    .filter((v, i) => v !== "00" || i > 0)
+                    .join(":")
+            }
+
+            let orderedContent = [];
+            content.splice(0, 1);
+
+            for (let row of content) {
+                let orderedRow = [];
+                let [name, status, timeSecEstimated, timeSecActual, matOne, matTwo, matOneGrams, matTwoGrams, matOneVol, matTwoVol, printStartTime, printEndTime, sentToPrinterTime, removedFromPrinterTime] =
+                    [row[9], row[12], row[2], row[13], row[3], row[4], row[7], row[8], row[5], row[6], row[11], row[10], row[0], row[1]];
+
+                name = name.replace('UMS5_', '');
+                (timeSecActual === "") ? timeSecActual = 'NA' : timeSecActual = toHHMMSS(timeSecActual)
+                timeSecEstimated = toHHMMSS(timeSecEstimated);
+
+                orderedRow[0] = name;
+                orderedRow[1] = status;
+                orderedRow[2] = timeSecActual;
+                orderedRow[3] = timeSecEstimated;
+                orderedRow[4] = matOne;
+                orderedRow[5] = matOneGrams;
+                orderedRow[6] = matOneVol;
+                orderedRow[7] = matTwo;
+                orderedRow[8] = matTwoGrams;
+                orderedRow[9] = matTwoVol;
+                orderedRow[10] = printStartTime;
+                orderedRow[11] = printEndTime;
+                orderedRow[12] = sentToPrinterTime;
+                orderedRow[13] = removedFromPrinterTime;
+
+                orderedContent.push(orderedRow);
+            }
+
+            let orderedContentReversed = orderedContent.reverse();
+
+            let colNames = ['Name', 'Status', 'Print time', 'Print time estimated', 'Material 1', 'Mass (g)', 'Vol (mm3)', 'Material 2', 'Mass (g)', 'Vol (mm3)', 'Started Print', 'Ended Print', 'Sent to printer', 'Removed from printer'];
+            orderedContentReversed.splice(0, 0, colNames);
+            return orderedContentReversed;
+        }
+
+        function readSingleFile(evt) {
+            // https://stackoverflow.com/a/55929686/7454736
+            var f = evt.target.files[0];
+            if (f) {
+                var r = new FileReader();
+                r.onload = function (e) {
+                    var contents = e.target.result;
+                    document.write("File Uploaded! <br />" + "name: " + f.name + "<br />" + "type: " + f.type + "<br />" + "size: " + f.size + " bytes <br />");
+
+                    let contentsArray = CSVToArray(contents, "\t");
+                    let relevantContent = removeIrrelevantContent(contentsArray);
+                    let orderedContent = orderContent(relevantContent);
+                    makeTable(orderedContent);
+                }
+                r.readAsText(f);
+            } else {
+                alert("Failed to load file");
+            }
+        }
+        document.getElementById('fileinput').addEventListener('change', readSingleFile);
+    </script>
+
+</body>
+</html>
