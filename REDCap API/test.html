@@ -1,20 +1,32 @@
 <!DOCTYPE html>
 <html>
 <head>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-<script>
-$(document).ready(function(){
-  $("button").click(function(){
-    $("#div1").load("demo_test.txt");
-  });
-});
-</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-csv/1.0.21/jquery.csv.min.js" integrity="sha512-Y8iWYJDo6HiTo5xtml1g4QqHtl/PO1w+dmUpQfQSOTqKNsMhExfyPN2ncNAe9JuJUSKzwK/b6oaNPop4MXzkwg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 </head>
 <body>
+    <h2>REDCap API</h2>
+    <p>Parse REDCap API</p>
+    <script>
+	
+		const settings = {
+			"async": true,
+			"crossDomain": false,
+			"url": "https://redcap.ochsner.org/api/",
+			"method": "POST",
+			"headers": {
+				"token": "4539533CF2E81693F8DFCFE80348DB0A",
+				"content": 'project',
+				"format": 'xml',
+				'returnFormat': 'json'
+			}
+		};
 
-<div id="div1"><h2>Let jQuery AJAX Change This Text</h2></div>
+		$.ajax(settings).done(function (response) {
+			console.log(response);
+		});
 
-<button>Get External Content</button>
+    </script>
 
 </body>
 </html>
