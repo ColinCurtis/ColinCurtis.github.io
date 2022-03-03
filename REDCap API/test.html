@@ -9,13 +9,15 @@
     <p>Parse REDCap API</p>
     <script>
 	
+		const apiToken = prompt("Enter API token")
+		
 		const settings = {
 			"async": true,
 			"crossDomain": false,
 			"url": "https://redcap.ochsner.org/api/",
 			"method": "POST",
 			"headers": {
-				"token": "test",
+				"token": apiToken,
 				"content": 'project',
 				"format": 'xml',
 				'returnFormat': 'json'
